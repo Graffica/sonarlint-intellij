@@ -105,6 +105,7 @@ public class SonarExternalAnnotator extends ExternalAnnotator<SonarExternalAnnot
 
     Annotation annotation = annotationHolder
       .createAnnotation(getSeverity(issue.getSeverity()), textRange, issue.getMessage(), htmlMsg);
+    annotation.registerFix(new JumpToRuleDescriptionQuickFix(issue.getRuleKey()));
     annotation.registerFix(new DisableRuleQuickFix(issue.getRuleKey()));
 
     if (!issue.flows().isEmpty()) {
