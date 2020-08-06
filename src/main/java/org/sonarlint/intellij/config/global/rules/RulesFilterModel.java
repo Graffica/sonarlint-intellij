@@ -117,10 +117,7 @@ public class RulesFilterModel {
       return true;
     }
 
-    List<String> split = new ArrayList<>();
-    split.addAll(tokenize(rule.getName()));
-    split.addAll(tokenize(rule.getKey()));
-    return Collections.indexOfSubList(split, tokenizedText) != -1;
+    return tokenizedText.stream().allMatch(t -> rule.getKey().equalsIgnoreCase(t) || rule.getName().toLowerCase(Locale.US).contains(t));
   }
 
   private static List<String> tokenize(@Nullable String str) {
