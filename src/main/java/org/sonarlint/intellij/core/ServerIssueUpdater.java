@@ -19,30 +19,22 @@
  */
 package org.sonarlint.intellij.core;
 
+import com.intellij.dvcs.repo.VcsRepositoryManager;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.vcs.ProjectLevelVcsManager;
 import com.intellij.openapi.vfs.VirtualFile;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+
 import org.sonarlint.intellij.config.global.SonarQubeServer;
 import org.sonarlint.intellij.config.project.SonarLintProjectSettings;
 import org.sonarlint.intellij.exception.InvalidBindingException;
@@ -93,34 +85,60 @@ public class ServerIssueUpdater implements Disposable {
     try {
       ProjectBindingManager projectBindingManager = SonarLintUtils.getService(myProject, ProjectBindingManager.class);
       SonarQubeServer server = projectBindingManager.getSonarQubeServer();
-      ConnectedSonarLintEngine engine = projectBindingManager.getConnectedEngine();
-      String projectKey = projectSettings.getProjectKey();
 
-      int numFiles = filesPerModule.values().stream().mapToInt(Collection::size).sum();
-      boolean downloadAll = numFiles >= FETCH_ALL_ISSUES_THRESHOLD;
-      String msg;
+      Map<String, Map<Module, Collection<VirtualFile>>> groupByVcsRoots = groupByVcsRoots(filesPerModule);
+      for (Map.Entry<String, Map<Module, Collection<VirtualFile>>> entry : groupByVcsRoots.entrySet()) {
+        final String projectKey = projectSettings.getVcsRootMapping().get(entry.getKey());
+        ConnectedSonarLintEngine engine = projectBindingManager.getConnectedEngine(projectKey);
+        int numFiles = filesPerModule.values().stream().mapToInt(Collection::size).sum();
+        boolean downloadAll = numFiles >= FETCH_ALL_ISSUES_THRESHOLD;
+        String msg;
 
-      if (downloadAll) {
-        msg = "Fetching all server issues";
-      } else {
-        msg = "Fetching server issues in " + numFiles + SonarLintUtils.pluralize(" file", numFiles);
-      }
-      if (waitForCompletion) {
-        msg += " (waiting for results)";
-      }
-      SonarLintConsole console = SonarLintUtils.getService(myProject, SonarLintConsole.class);
-      console.debug(msg);
-      indicator.setText(msg);
+        if (downloadAll) {
+          msg = "Fetching all server issues";
+        } else {
+          msg = "Fetching server issues in " + numFiles + SonarLintUtils.pluralize(" file", numFiles);
+        }
+        if (waitForCompletion) {
+          msg += " (waiting for results)";
+        }
+        SonarLintConsole console = SonarLintUtils.getService(myProject, SonarLintConsole.class);
+        console.debug(msg);
+        indicator.setText(msg);
 
-      // submit tasks
-      List<Future<Void>> updateTasks = fetchAndMatchServerIssues(projectKey, filesPerModule, server, engine, downloadAll);
+        // submit tasks
+        List<Future<Void>> updateTasks = fetchAndMatchServerIssues(projectKey, filesPerModule, server, engine, downloadAll);
 
-      if (waitForCompletion) {
-        waitForTasks(updateTasks);
+        if (waitForCompletion) {
+          waitForTasks(updateTasks);
+        }
       }
     } catch (InvalidBindingException e) {
       // ignore, do nothing
     }
+  }
+
+  private Map<String, Map<Module, Collection<VirtualFile>>> groupByVcsRoots(Map<Module, Collection<VirtualFile>> filesPerModule) {
+    Map<String, Map<Module, Collection<VirtualFile>>> grouped = new HashMap<>();
+    for (Map.Entry<Module, Collection<VirtualFile>> entry : filesPerModule.entrySet()) {
+      try {
+        String vcsRoot = ApplicationManager.getApplication().executeOnPooledThread(() ->
+                ProjectLevelVcsManager.getInstance(entry.getKey().getProject()).getVcsRootFor(fileInsideModule(entry.getKey())).getCanonicalPath()).get();
+        Map<Module, Collection<VirtualFile>> map = grouped.computeIfAbsent(vcsRoot, k -> new HashMap<>());
+        map.put(entry.getKey(), entry.getValue());
+      } catch (InterruptedException | ExecutionException e) {
+        LOGGER.error(e.getMessage(), e);
+      }
+    }
+    return grouped;
+  }
+
+  @Nullable
+  private VirtualFile fileInsideModule(Module module) {
+    if (module.getModuleFile() != null) {
+      return module.getModuleFile();
+    }
+    return Arrays.stream(ModuleRootManager.getInstance(module).getContentRoots()).findFirst().orElse(null);
   }
 
   private static void waitForTasks(List<Future<Void>> updateTasks) {

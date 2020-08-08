@@ -75,7 +75,7 @@ public class SonarLintAnalyzer {
 
     try {
       ProjectBindingManager projectBindingManager = SonarLintUtils.getService(myProject, ProjectBindingManager.class);
-      SonarLintFacade facade = projectBindingManager.getFacade(true);
+      SonarLintFacade facade = projectBindingManager.getFacade(module, true);
 
       String what;
       if (filesToAnalyze.size() == 1) {

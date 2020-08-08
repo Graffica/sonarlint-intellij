@@ -19,16 +19,24 @@
  */
 package org.sonarlint.intellij.editor;
 
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.roots.ProjectFileIndex;
+import com.intellij.openapi.vfs.VirtualFile;
 import org.junit.Before;
 import org.junit.Test;
 import org.sonarlint.intellij.AbstractSonarLintLightTests;
-import org.sonarlint.intellij.AbstractSonarLintMockedTests;
 import org.sonarlint.intellij.core.ProjectBindingManager;
 import org.sonarlint.intellij.core.SonarLintFacade;
 import org.sonarlint.intellij.exception.InvalidBindingException;
+import org.sonarlint.intellij.util.SonarLintUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
@@ -39,14 +47,24 @@ public class SonarLinkHandlerTest extends AbstractSonarLintLightTests {
   private SonarLinkHandler handler = new SonarLinkHandler();
   private Editor editor = mock(Editor.class);
   private SonarLintFacade sonarlint = mock(SonarLintFacade.class);
+  private Document document = mock(Document.class);
+  private FileDocumentManager fileDocumentManager = mock(FileDocumentManager.class);
+  private ProjectFileIndex projectFileIndex = mock(ProjectFileIndex.class);
 
   @Before
   public void prepare() throws InvalidBindingException {
     ProjectBindingManager projectBindingManager = mock(ProjectBindingManager.class);
     replaceProjectService(ProjectBindingManager.class, projectBindingManager);
 
-    when(projectBindingManager.getFacade()).thenReturn(sonarlint);
+    replaceApplicationService(FileDocumentManager.class, fileDocumentManager);
+    replaceProjectService(ProjectFileIndex.class, projectFileIndex);
+
+    when(projectBindingManager.getFacade(any(Module.class), anyBoolean())).thenReturn(sonarlint);
     when(editor.getProject()).thenReturn(getProject());
+    when(editor.getDocument()).thenReturn(document);
+    VirtualFile file = mock(VirtualFile.class);
+    when(fileDocumentManager.getFile(document)).thenReturn(file);
+    when(projectFileIndex.getModuleForFile(file)).thenReturn(getModule());
   }
 
   @Test

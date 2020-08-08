@@ -19,6 +19,8 @@
  */
 package org.sonarlint.intellij.config.project;
 
+import com.google.common.base.Predicates;
+import com.google.common.base.Strings;
 import com.intellij.ide.DataManager;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.application.ApplicationManager;
@@ -27,10 +29,16 @@ import com.intellij.openapi.options.ex.Settings;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.messages.MessageBusConnection;
+
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.swing.JComponent;
+
 import org.jetbrains.annotations.Nls;
 import org.sonarlint.intellij.config.global.SonarLintGlobalConfigurable;
 import org.sonarlint.intellij.config.global.SonarLintGlobalSettings;
@@ -110,15 +118,20 @@ public class SonarLintProjectConfigurable implements Configurable, Configurable.
     SonarLintProjectNotifications.get(project).reset();
     ProjectConfigurationListener projectListener = project.getMessageBus().syncPublisher(ProjectConfigurationListener.TOPIC);
     SonarLintProjectSettings projectSettings = getProjectSettings();
-    if (projectSettings.isBindingEnabled() && projectSettings.getProjectKey() != null && projectSettings.getServerId() != null) {
+    if (projectSettings.isBindingEnabled() && projectSettings.getVcsRootMapping().isEmpty()
+            && projectSettings.getServerId() != null) {
       ProjectBindingManager bindingManager = SonarLintUtils.getService(project, ProjectBindingManager.class);
 
       try {
         SonarQubeServer server = bindingManager.getSonarQubeServer();
         ConnectedSonarLintEngine engine = bindingManager.getConnectedEngineSkipChecks();
-        String projectKey = projectSettings.getProjectKey();
+        List<String> projectKeys = new ArrayList<>();
+        projectKeys.addAll(projectSettings.getVcsRootMapping()
+                .values().stream().filter(Predicates.not(String::isEmpty)).collect(Collectors.toList()));
+        Map<String, List<Project>> projectMap = projectKeys.stream()
+                .collect(Collectors.toMap(o -> o, s -> Collections.singletonList(project)));
 
-        ServerUpdateTask task = new ServerUpdateTask(engine, server, Collections.singletonMap(projectKey, Collections.singletonList(project)), true);
+        ServerUpdateTask task = new ServerUpdateTask(engine, server, projectMap, true, projectSettings.getVcsRootMapping());
         ProgressManager.getInstance().run(task.asModal());
       } catch (InvalidBindingException e) {
         // nothing to do, SonarLintEngineManager should have already shown a warning

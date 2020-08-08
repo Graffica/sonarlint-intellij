@@ -21,14 +21,22 @@ package org.sonarlint.intellij.editor;
 
 import com.intellij.codeInsight.highlighting.TooltipLinkHandler;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleManager;
+import com.intellij.openapi.module.ModuleUtil;
 import com.intellij.openapi.project.Project;
 import javax.annotation.Nullable;
+
+import com.intellij.openapi.vfs.VirtualFile;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.jetbrains.annotations.NotNull;
 import org.sonarlint.intellij.core.ProjectBindingManager;
 import org.sonarlint.intellij.core.SonarLintFacade;
 import org.sonarlint.intellij.exception.InvalidBindingException;
 import org.sonarlint.intellij.util.SonarLintUtils;
+
+import java.util.Optional;
 
 public class SonarLinkHandler extends TooltipLinkHandler {
   @Nullable
@@ -41,7 +49,7 @@ public class SonarLinkHandler extends TooltipLinkHandler {
 
     ProjectBindingManager projectBindingManager = SonarLintUtils.getService(project, ProjectBindingManager.class);
     try {
-      SonarLintFacade sonarlint = projectBindingManager.getFacade();
+      SonarLintFacade sonarlint = projectBindingManager.getFacade(resolveModule(editor), true);
       String description = sonarlint.getDescription(refSuffix);
       String name = sonarlint.getRuleName(refSuffix);
       return transform(refSuffix, name, description);
@@ -49,6 +57,11 @@ public class SonarLinkHandler extends TooltipLinkHandler {
       return "";
     }
 
+  }
+
+  private Module resolveModule(Editor editor) {
+    VirtualFile file = FileDocumentManager.getInstance().getFile(editor.getDocument());
+    return Optional.ofNullable(file).map(f -> ModuleUtil.findModuleForFile(file, editor.getProject())).orElse(null);
   }
 
   private static String transform(String ruleKey, @Nullable String ruleName, @Nullable String description) {

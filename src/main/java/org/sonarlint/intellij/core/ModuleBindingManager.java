@@ -19,12 +19,16 @@
  */
 package org.sonarlint.intellij.core;
 
+import com.intellij.dvcs.repo.VcsRepositoryManager;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.roots.ModuleRootManager;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import javax.annotation.CheckForNull;
+
+import jdk.internal.joptsimple.internal.Strings;
 import org.sonarlint.intellij.config.module.SonarLintModuleSettings;
 import org.sonarlint.intellij.config.project.SonarLintProjectSettings;
 import org.sonarlint.intellij.util.SonarLintAppUtils;
@@ -41,7 +45,7 @@ public class ModuleBindingManager {
 
   @CheckForNull
   public ProjectBinding getBinding() {
-    String projectKey = SonarLintUtils.getService(module.getProject(), SonarLintProjectSettings.class).getProjectKey();
+    String projectKey = resolveProjectKey(module);
     if (projectKey == null) {
       return null;
     }
@@ -50,7 +54,7 @@ public class ModuleBindingManager {
   }
 
   public void updateBinding(ConnectedSonarLintEngine engine) {
-    String projectKey = SonarLintUtils.getService(module.getProject(), SonarLintProjectSettings.class).getProjectKey();
+    String projectKey = resolveProjectKey(module);
     if (projectKey == null) {
       throw new IllegalStateException("Project is not bound");
     }
@@ -76,5 +80,10 @@ public class ModuleBindingManager {
       });
       return paths;
     });
+  }
+
+  private String resolveProjectKey(Module module) {
+    SonarLintProjectSettings settings = SonarLintUtils.getService(module.getProject(), SonarLintProjectSettings.class);
+    return SonarLintProjectSettings.resolveProjectkey(module.getProject(), module, settings);
   }
 }

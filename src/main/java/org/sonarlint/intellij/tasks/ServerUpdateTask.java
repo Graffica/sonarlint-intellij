@@ -19,6 +19,7 @@
  */
 package org.sonarlint.intellij.tasks;
 
+import com.google.common.collect.Maps;
 import com.intellij.history.utils.RunnableAdapter;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
@@ -30,12 +31,15 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.jetbrains.annotations.NotNull;
 import org.sonarlint.intellij.config.global.SonarQubeServer;
 import org.sonarlint.intellij.core.ModuleBindingManager;
@@ -60,12 +64,14 @@ public class ServerUpdateTask {
   private final SonarQubeServer server;
   private final Map<String, List<Project>> projectsPerProjectKey;
   private final boolean onlyModules;
+  private final Map<String, String> vcsRootMapping;
 
-  public ServerUpdateTask(ConnectedSonarLintEngine engine, SonarQubeServer server, Map<String, List<Project>> projectsPerProjectKey, boolean onlyModules) {
+  public ServerUpdateTask(ConnectedSonarLintEngine engine, SonarQubeServer server, Map<String, List<Project>> projectsPerProjectKey, boolean onlyModules, Map<String, String> vcsRootMapping) {
     this.engine = engine;
     this.server = server;
     this.projectsPerProjectKey = projectsPerProjectKey;
     this.onlyModules = onlyModules;
+    this.vcsRootMapping = vcsRootMapping;
   }
 
   public Task.Modal asModal() {
@@ -152,7 +158,14 @@ public class ServerUpdateTask {
     Set<String> failedProjects = new LinkedHashSet<>();
     for (Map.Entry<String, List<Project>> entry : projectsPerProjectKey.entrySet()) {
       try {
-        updateProject(serverConfiguration, entry.getKey(), entry.getValue(), monitor);
+        if (vcsRootMapping.isEmpty()) {
+          updateProject(serverConfiguration, entry.getKey(), entry.getValue(), monitor);
+        } else {
+          Map<String, String> keyToRoot = vcsRootMapping.entrySet().stream().collect(Collectors.toMap(e -> e.getValue(), e -> e.getKey()));
+          for (Project project : entry.getValue()) {
+            updateVCSModules(serverConfiguration, entry.getKey(), keyToRoot.get(entry.getKey()), project, monitor);
+          }
+        }
       } catch (Throwable e) {
         // in case of error, save project key and keep updating other projects
         LOGGER.info(e.getMessage(), e);
@@ -179,6 +192,18 @@ public class ServerUpdateTask {
     GlobalLogOutput.get().log("Project '" + projectKey + "' in server binding '" + server.getName() + "' updated", LogOutput.Level.INFO);
     projects.forEach(this::updateModules);
     projects.forEach(ServerUpdateTask::analyzeOpenFiles);
+  }
+
+  private void updateVCSModules(ServerConfiguration serverConfiguration, String projectKey, String vcsRoot, Project project, TaskProgressMonitor monitor) {
+    engine.updateProject(serverConfiguration, projectKey, monitor);
+    GlobalLogOutput.get().log("Project '" + projectKey + "' in server binding '" + server.getName() + "' updated", LogOutput.Level.INFO);
+
+    if (!project.isDisposed()) {
+      Stream.of(ModuleManager.getInstance(project).getModules())
+              .filter(module -> module.getModuleFilePath().startsWith(vcsRoot))
+              .forEach(module -> SonarLintUtils.getService(module, ModuleBindingManager.class).updateBinding(engine));
+      analyzeOpenFiles(project);
+    }
   }
 
   private void updateModules(Project project) {

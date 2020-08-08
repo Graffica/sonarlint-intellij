@@ -19,9 +19,15 @@
  */
 package org.sonarlint.intellij.core;
 
+import com.intellij.dvcs.repo.Repository;
+import com.intellij.dvcs.repo.VcsRepositoryManager;
+import com.intellij.openapi.application.Application;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.sonarlint.intellij.config.global.SonarLintGlobalSettings;
@@ -56,24 +62,24 @@ public class ProjectBindingManager {
    *
    * @throws InvalidBindingException If current project binding is invalid
    */
-  public synchronized SonarLintFacade getFacade() throws InvalidBindingException {
-    return getFacade(false);
+  public synchronized SonarLintFacade getFacade(Module module) throws InvalidBindingException {
+    return getFacade(module, false);
   }
 
-  public synchronized SonarLintFacade getFacade(boolean logDetails) throws InvalidBindingException {
+  public synchronized SonarLintFacade getFacade(Module module, boolean logDetails) throws InvalidBindingException {
     SonarLintEngineManager engineManager = this.engineManagerSupplier.get();
     SonarLintProjectSettings projectSettings = SonarLintUtils.getService(myProject, SonarLintProjectSettings.class);
     SonarLintProjectNotifications notifications = SonarLintUtils.getService(myProject, SonarLintProjectNotifications.class);
     SonarLintConsole console = SonarLintUtils.getService(myProject, SonarLintConsole.class);
     if (projectSettings.isBindingEnabled()) {
       String serverId = projectSettings.getServerId();
-      String projectKey = projectSettings.getProjectKey();
+      String projectKey = SonarLintProjectSettings.resolveProjectkey(myProject, module, projectSettings);
       checkBindingStatus(notifications, serverId, projectKey);
       if (logDetails) {
         console.info(String.format("Using configuration of '%s' in server '%s'", projectKey, serverId));
       }
       ConnectedSonarLintEngine engine = engineManager.getConnectedEngine(notifications, serverId, projectKey);
-      return new ConnectedSonarLintFacade(engine, myProject);
+      return new ConnectedSonarLintFacade(engine, myProject, module);
     }
 
     return new StandaloneSonarLintFacade(myProject, engineManager.getStandaloneEngine());
@@ -85,14 +91,13 @@ public class ProjectBindingManager {
     return engineManager.getConnectedEngine(projectSettings.getServerId());
   }
 
-  public synchronized ConnectedSonarLintEngine getConnectedEngine() throws InvalidBindingException {
+  public synchronized ConnectedSonarLintEngine getConnectedEngine(String projectKey) throws InvalidBindingException {
     SonarLintProjectSettings projectSettings = SonarLintUtils.getService(myProject, SonarLintProjectSettings.class);
     if (!projectSettings.isBindingEnabled()) {
       throw new IllegalStateException("Project is not bound to a SonarQube project");
     }
     SonarLintProjectNotifications notifications = SonarLintUtils.getService(myProject, SonarLintProjectNotifications.class);
     String serverId = projectSettings.getServerId();
-    String projectKey = projectSettings.getProjectKey();
     checkBindingStatus(notifications, serverId, projectKey);
 
     SonarLintEngineManager engineManager = this.engineManagerSupplier.get();

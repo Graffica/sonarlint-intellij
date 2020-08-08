@@ -19,14 +19,23 @@
  */
 package org.sonarlint.intellij.config.project;
 
+import com.intellij.dvcs.repo.Repository;
+import com.intellij.dvcs.repo.VcsRepositoryManager;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
+import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.vcs.ProjectLevelVcsManager;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.xmlb.XmlSerializerUtil;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import org.sonarlint.intellij.exception.InvalidBindingException;
+
+import java.util.*;
+import java.util.concurrent.ExecutionException;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nullable;
 
@@ -38,8 +47,8 @@ public final class SonarLintProjectSettings implements PersistentStateComponent<
   private Map<String, String> additionalProperties = new LinkedHashMap<>();
   private boolean bindingEnabled = false;
   private String serverId = null;
-  private String projectKey = null;
   private List<String> fileExclusions = new ArrayList<>();
+  private Map<String, String> vcsRootMapping = new LinkedHashMap<>();
 
   /**
    * Constructor called by the XML serialization and deserialization (no args).
@@ -74,15 +83,6 @@ public final class SonarLintProjectSettings implements PersistentStateComponent<
 
   public void setVerboseEnabled(boolean verboseEnabled) {
     this.verboseEnabled = verboseEnabled;
-  }
-
-  @CheckForNull
-  public String getProjectKey() {
-    return projectKey;
-  }
-
-  public void setProjectKey(@Nullable String projectKey) {
-    this.projectKey = projectKey;
   }
 
   public Map<String, String> getAdditionalProperties() {
@@ -126,5 +126,28 @@ public final class SonarLintProjectSettings implements PersistentStateComponent<
     this.fileExclusions = new ArrayList<>(fileExclusions);
   }
 
+  public Map<String, String> getVcsRootMapping() {
+    return vcsRootMapping;
+  }
+
+  public void setVcsRootMapping(Map<String, String> vcsRootMapping) {
+    this.vcsRootMapping = new LinkedHashMap<>(vcsRootMapping);
+  }
+
+  public static String resolveProjectkey(Project project, Module module, SonarLintProjectSettings projectSettings) {
+    try {
+      return ApplicationManager.getApplication().executeOnPooledThread(() ->
+              Optional.ofNullable(module).map(m ->
+                      Optional.ofNullable(m.getModuleFile())
+                              .orElseGet(() -> Arrays.stream(ModuleRootManager.getInstance(m).getContentRoots()).findFirst().orElse(null)))
+                      .map(virtualFile -> {
+                        VirtualFile root = ProjectLevelVcsManager.getInstance(project).getVcsRootFor(virtualFile);
+                        return projectSettings.getVcsRootMapping().get(root.getCanonicalPath());
+                      }).orElse(null)).get();
+    } catch (InterruptedException | ExecutionException e) {
+      Logger.getInstance(SonarLintProjectSettings.class).error(e.getMessage(), e);
+    }
+    return null;
+  }
 
 }

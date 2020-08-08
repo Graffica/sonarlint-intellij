@@ -26,6 +26,7 @@ import com.intellij.openapi.fileEditor.FileEditorManagerAdapter;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.HyperlinkAdapter;
@@ -133,7 +134,7 @@ public class AutoTriggerStatusPanel {
   private boolean isExcludedInServer(Module m, VirtualFile f) {
     VirtualFileTestPredicate testPredicate = SonarLintUtils.getService(m, VirtualFileTestPredicate.class);
     try {
-      Collection<VirtualFile> afterExclusion = SonarLintUtils.getService(project, ProjectBindingManager.class).getFacade().getExcluded(m, Collections.singleton(f), testPredicate);
+      Collection<VirtualFile> afterExclusion = SonarLintUtils.getService(project, ProjectBindingManager.class).getFacade(m, true).getExcluded(m, Collections.singleton(f), testPredicate);
       return !afterExclusion.isEmpty();
     } catch (InvalidBindingException e) {
       // not much we can do, analysis won't run anyway. Notification about it was shown by SonarLintEngineManager

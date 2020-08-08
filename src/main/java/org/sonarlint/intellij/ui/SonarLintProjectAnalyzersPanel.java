@@ -20,15 +20,15 @@
 package org.sonarlint.intellij.ui;
 
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.table.JBTable;
 import com.intellij.util.ui.JBUI;
 import java.awt.Component;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.table.AbstractTableModel;
@@ -36,6 +36,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellRenderer;
 import org.apache.commons.lang.StringUtils;
 import org.sonarlint.intellij.core.ProjectBindingManager;
+import org.sonarlint.intellij.exception.InvalidBindingException;
 import org.sonarlint.intellij.util.SonarLintUtils;
 import org.sonarsource.sonarlint.core.client.api.common.PluginDetails;
 
@@ -59,7 +60,15 @@ public class SonarLintProjectAnalyzersPanel {
   public void reload() {
     ProjectBindingManager bindingManager = SonarLintUtils.getService(project, ProjectBindingManager.class);
     try {
-      Collection<PluginDetails> loadedAnalyzers = bindingManager.getFacade().getLoadedAnalyzers();
+      List<PluginDetails> loadedAnalyzers = Stream.of(ModuleManager.getInstance(project).getModules())
+              .flatMap(module -> {
+                try {
+                  return bindingManager.getFacade(module, true).getLoadedAnalyzers().stream();
+                } catch (InvalidBindingException e) {
+                  return Stream.empty();
+                }
+              })
+              .collect(Collectors.toList());
       tableModel.set(loadedAnalyzers);
     } catch (Exception e) {
       LOGGER.error(e);

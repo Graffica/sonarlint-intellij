@@ -19,8 +19,17 @@
  */
 package org.sonarlint.intellij.core;
 
-import com.intellij.openapi.project.Project;
 import java.util.Collections;
+import java.util.Map;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import com.intellij.conversion.ModuleSettings;
+import com.intellij.dvcs.repo.Repository;
+import com.intellij.dvcs.repo.VcsRepositoryManager;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.vcs.ProjectLevelVcsManager;
+import com.intellij.openapi.vfs.VirtualFile;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -39,9 +48,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 public class ProjectBindingManagerTest extends AbstractSonarLintLightTests {
   private ProjectBindingManager projectBindingManager;
@@ -49,6 +56,7 @@ public class ProjectBindingManagerTest extends AbstractSonarLintLightTests {
   private StandaloneSonarLintEngine standaloneEngine = mock(StandaloneSonarLintEngine.class);
   private ConnectedSonarLintEngine connectedEngine = mock(ConnectedSonarLintEngine.class);
   private SonarLintEngineManager engineManager = mock(SonarLintEngineManager.class);
+  private Module module = mock(Module.class);
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
@@ -64,43 +72,50 @@ public class ProjectBindingManagerTest extends AbstractSonarLintLightTests {
     when(engineManager.getStandaloneEngine()).thenReturn(standaloneEngine);
     when(engineManager.getConnectedEngine(any(SonarLintProjectNotifications.class), anyString(), anyString())).thenReturn(connectedEngine);
     projectBindingManager = new ProjectBindingManager(getProject(), () -> engineManager);
+
+    ProjectLevelVcsManager projectLevelVcsManager = mock(ProjectLevelVcsManager.class, RETURNS_DEEP_STUBS);
+    replaceProjectService(ProjectLevelVcsManager.class, projectLevelVcsManager);
+    VirtualFile moduleFile = mock(VirtualFile.class);
+    when(module.getModuleFile()).thenReturn(moduleFile);
+    when(module.getProject()).thenReturn(getProject());
+    when(projectLevelVcsManager.getVcsRootFor(moduleFile).getCanonicalPath()).thenReturn("/project");
   }
 
   @Test
   public void should_create_facade_standalone() throws InvalidBindingException {
-    assertThat(projectBindingManager.getFacade()).isInstanceOf(StandaloneSonarLintFacade.class);
+    assertThat(projectBindingManager.getFacade(null, true)).isInstanceOf(StandaloneSonarLintFacade.class);
   }
 
   @Test
   public void should_get_connected_engine() throws InvalidBindingException {
     getProjectSettings().setBindingEnabled(true);
-    getProjectSettings().setProjectKey("project1");
+    getProjectSettings().setVcsRootMapping(ImmutableMap.of("/project", "project1"));
     getProjectSettings().setServerId("server1");
 
-    assertThat(projectBindingManager.getConnectedEngine()).isNotNull();
+    assertThat(projectBindingManager.getConnectedEngine("project1")).isNotNull();
     verify(engineManager).getConnectedEngine(any(SonarLintProjectNotifications.class), eq("server1"), eq("project1"));
   }
 
   @Test
   public void fail_get_connected_engine_if_not_connected() throws InvalidBindingException {
     exception.expect(IllegalStateException.class);
-    projectBindingManager.getConnectedEngine();
+    projectBindingManager.getConnectedEngine("project1");
   }
 
   @Test
   public void should_create_facade_connected() throws InvalidBindingException {
     getProjectSettings().setBindingEnabled(true);
-    getProjectSettings().setProjectKey("project1");
+    getProjectSettings().setVcsRootMapping(ImmutableMap.of("/project", "project1"));
     getProjectSettings().setServerId("server1");
 
-    assertThat(projectBindingManager.getFacade()).isInstanceOf(ConnectedSonarLintFacade.class);
+    assertThat(projectBindingManager.getFacade(module, true)).isInstanceOf(ConnectedSonarLintFacade.class);
   }
 
   @Test
   public void should_find_sq_server() throws InvalidBindingException {
     SonarLintGlobalSettings globalSettings = SonarLintUtils.getService(SonarLintGlobalSettings.class);
     getProjectSettings().setBindingEnabled(true);
-    getProjectSettings().setProjectKey("project1");
+    getProjectSettings().setVcsRootMapping(ImmutableMap.of("/project", "project1"));
     getProjectSettings().setServerId("server1");
 
     SonarQubeServer server = SonarQubeServer.newBuilder().setName("server1").build();
@@ -112,7 +127,7 @@ public class ProjectBindingManagerTest extends AbstractSonarLintLightTests {
   public void fail_if_cant_find_server() throws InvalidBindingException {
     SonarLintGlobalSettings globalSettings = SonarLintUtils.getService(SonarLintGlobalSettings.class);
     getProjectSettings().setBindingEnabled(true);
-    getProjectSettings().setProjectKey("project1");
+    getProjectSettings().setVcsRootMapping(ImmutableMap.of("/project", "project1"));
     getProjectSettings().setServerId("server1");
 
     SonarQubeServer server = SonarQubeServer.newBuilder().setName("server2").build();
@@ -126,17 +141,17 @@ public class ProjectBindingManagerTest extends AbstractSonarLintLightTests {
     getProjectSettings().setBindingEnabled(true);
     exception.expect(InvalidBindingException.class);
     exception.expectMessage("Project has an invalid binding");
-    assertThat(projectBindingManager.getFacade()).isNotNull();
+    assertThat(projectBindingManager.getFacade(null, true)).isNotNull();
   }
 
   @Test
   public void fail_invalid_module_binding() throws InvalidBindingException {
     getProjectSettings().setBindingEnabled(true);
     getProjectSettings().setServerId("server1");
-    getProjectSettings().setProjectKey(null);
+    getProjectSettings().setVcsRootMapping(ImmutableMap.of("/project", "project1"));
 
     exception.expect(InvalidBindingException.class);
     exception.expectMessage("Project has an invalid binding");
-    assertThat(projectBindingManager.getFacade()).isNotNull();
+    assertThat(projectBindingManager.getFacade(null, true)).isNotNull();
   }
 }

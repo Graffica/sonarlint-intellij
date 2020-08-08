@@ -19,6 +19,11 @@
  */
 package org.sonarlint.intellij.core;
 
+import com.google.common.collect.ImmutableMap;
+import com.intellij.dvcs.repo.Repository;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.vcs.ProjectLevelVcsManager;
+import com.intellij.openapi.vfs.VirtualFile;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -36,19 +41,27 @@ import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 public class ConnectedSonarLintFacadeTest extends AbstractSonarLintLightTests {
 
   private final ConnectedSonarLintEngine engine = mock(ConnectedSonarLintEngine.class);
   private ConnectedSonarLintFacade facade;
+  private Module module = mock(Module.class);
+  private ProjectLevelVcsManager projectLevelVcsManager = mock(ProjectLevelVcsManager.class, RETURNS_DEEP_STUBS);
 
   @Before
   public void before() {
     replaceProjectService(SonarLintProjectSettings.class, getProjectSettings());
-    getProjectSettings().setProjectKey("projectKey");
-    facade = new ConnectedSonarLintFacade(engine, getProject());
+    replaceProjectService(ProjectLevelVcsManager.class, projectLevelVcsManager);
+    getProjectSettings().setVcsRootMapping(ImmutableMap.of("/project", "projectKey"));
+
+    facade = new ConnectedSonarLintFacade(engine, getProject(), module);
+
+    VirtualFile moduleFile = mock(VirtualFile.class);
+    when(module.getModuleFile()).thenReturn(moduleFile);
+    when(module.getProject()).thenReturn(getProject());
+    when(projectLevelVcsManager.getVcsRootFor(moduleFile).getCanonicalPath()).thenReturn("/project");
   }
 
   @Test
@@ -80,7 +93,7 @@ public class ConnectedSonarLintFacadeTest extends AbstractSonarLintLightTests {
   @Test
   public void should_start_analysis() {
     String projectKey = "project-key";
-    getProjectSettings().setProjectKey(projectKey);
+    getProjectSettings().setVcsRootMapping(ImmutableMap.of("/project", projectKey));
     AnalysisResults results = mock(AnalysisResults.class);
     ArgumentCaptor<ConnectedAnalysisConfiguration> configCaptor = ArgumentCaptor.forClass(ConnectedAnalysisConfiguration.class);
     when(engine.analyze(configCaptor.capture(), any(IssueListener.class), any(LogOutput.class), any(ProgressMonitor.class))).thenReturn(results);

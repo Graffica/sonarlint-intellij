@@ -26,6 +26,9 @@ import com.intellij.notification.NotificationType;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.messages.MessageBusConnection;
 import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.sonarlint.intellij.config.global.SonarLintGlobalSettings;
 import org.sonarlint.intellij.config.global.SonarQubeServer;
 import org.sonarlint.intellij.config.project.SonarLintProjectSettings;
@@ -83,8 +86,9 @@ public class ProjectServerNotifications {
         return;
       }
       if (server.enableNotifications()) {
-        NotificationConfiguration config = createConfiguration(settings, server);
-        ServerNotifications.get().register(config);
+        createConfiguration(settings, server).forEach(config -> {
+          ServerNotifications.get().register(config);
+        });
       }
     }
   }
@@ -93,10 +97,11 @@ public class ProjectServerNotifications {
     ServerNotifications.get().unregister(eventListener);
   }
 
-  private NotificationConfiguration createConfiguration(SonarLintProjectSettings settings, SonarQubeServer server) {
-    String projectKey = settings.getProjectKey();
-    ServerConfiguration serverConfiguration = SonarLintUtils.getServerConfiguration(server);
-    return new NotificationConfiguration(eventListener, notificationTime, projectKey, serverConfiguration);
+  private List<NotificationConfiguration> createConfiguration(SonarLintProjectSettings settings, SonarQubeServer server) {
+    return settings.getVcsRootMapping().values().stream().map(key -> {
+      ServerConfiguration serverConfiguration = SonarLintUtils.getServerConfiguration(server);
+      return new NotificationConfiguration(eventListener, notificationTime, key, serverConfiguration);
+    }).collect(Collectors.toList());
   }
 
   /**

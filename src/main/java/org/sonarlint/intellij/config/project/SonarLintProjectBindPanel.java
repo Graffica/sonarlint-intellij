@@ -81,6 +81,9 @@ public class SonarLintProjectBindPanel {
   private JBTextField projectKeyTextField;
   private JButton searchProjectButton;
 
+  // vcs root binding
+  private SonarLintVcsRootBindPanel vcsRootBindPanel;
+
   private Project project;
 
   public JPanel create(Project project) {
@@ -89,13 +92,15 @@ public class SonarLintProjectBindPanel {
     bindEnable = new JBCheckBox("Bind project to SonarQube / SonarCloud", true);
     bindEnable.addItemListener(new BindItemListener());
     createBindPanel();
+    vcsRootBindPanel = new SonarLintVcsRootBindPanel(project);
 
     rootPanel.add(bindEnable, BorderLayout.NORTH);
     rootPanel.add(bindPanel, BorderLayout.CENTER);
+    rootPanel.add(vcsRootBindPanel.getComponent(), BorderLayout.SOUTH);
     return rootPanel;
   }
 
-  public void load(Collection<SonarQubeServer> servers, boolean enabled, @Nullable String selectedServerId, @Nullable String selectedProjectKey) {
+  public void load(Collection<SonarQubeServer> servers, boolean enabled, @Nullable String selectedServerId, @Nullable String selectedProjectKey, Map<String, String> vcsRootMapping) {
     ApplicationManager.getApplication().assertIsDispatchThread();
     this.bindEnable.setSelected(enabled);
 
@@ -104,6 +109,7 @@ public class SonarLintProjectBindPanel {
     if (selectedProjectKey != null) {
       projectKeyTextField.setText(selectedProjectKey);
     }
+    vcsRootBindPanel.setVcsRootMappings(vcsRootMapping);
   }
 
   @CheckForNull
@@ -292,6 +298,10 @@ public class SonarLintProjectBindPanel {
 
   public boolean isBindingEnabled() {
     return bindEnable.isSelected();
+  }
+
+  public Map<String, String> getVcsRootMapping() {
+    return vcsRootBindPanel.getVcsRootMappings();
   }
 
   /**

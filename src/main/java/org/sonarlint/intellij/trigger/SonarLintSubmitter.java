@@ -174,13 +174,13 @@ public class SonarLintSubmitter {
   private void filterWithServerExclusions(boolean checkExclusions, List<VirtualFile> filesToClearIssues, Map<Module, Collection<VirtualFile>> filesByModule)
     throws InvalidBindingException {
     ProjectBindingManager projectBindingManager = SonarLintUtils.getService(myProject, ProjectBindingManager.class);
-    SonarLintFacade sonarLintFacade = projectBindingManager.getFacade();
     // Apply server file exclusions. This is an expensive operation, so we call the core only once per module.
     if (checkExclusions) {
       // Note: iterating over a copy of keys, because removal of last value removes the key,
       // resulting in ConcurrentModificationException
       List<Module> modules = new ArrayList<>(filesByModule.keySet());
       for (Module module : modules) {
+        SonarLintFacade sonarLintFacade = projectBindingManager.getFacade(module, true);
         Collection<VirtualFile> virtualFiles = filesByModule.get(module);
         VirtualFileTestPredicate testPredicate = SonarLintUtils.getService(module, VirtualFileTestPredicate.class);
         Collection<VirtualFile> excluded = sonarLintFacade.getExcluded(module, virtualFiles, testPredicate);

@@ -20,6 +20,8 @@
 package org.sonarlint.intellij.ui;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.IdeBorderFactory;
@@ -89,7 +91,8 @@ public class SonarLintRulePanel {
       nothingToDisplay(false);
     } else {
       try {
-        SonarLintFacade facade = SonarLintUtils.getService(project, ProjectBindingManager.class).getFacade();
+        Module module = ModuleUtil.findModuleForFile(issue.psiFile());
+        SonarLintFacade facade = SonarLintUtils.getService(project, ProjectBindingManager.class).getFacade(module, true);
         RuleDetails rule = facade.ruleDetails(issue.getRuleKey());
         String description = facade.getDescription(issue.getRuleKey());
         if (rule == null || description == null) {

@@ -19,7 +19,12 @@
  */
 package org.sonarlint.intellij.core;
 
+import com.google.common.collect.ImmutableMap;
+import com.intellij.dvcs.repo.Repository;
+import com.intellij.openapi.module.Module;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
+import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.vcs.ProjectLevelVcsManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -42,14 +47,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 public class ServerIssueUpdaterTest extends AbstractSonarLintLightTests {
   private static final String SERVER_ID = "myServer";
@@ -60,6 +58,8 @@ public class ServerIssueUpdaterTest extends AbstractSonarLintLightTests {
   private IssueManager issueManager = mock(IssueManager.class);
   private SonarLintConsole mockedConsole = mock(SonarLintConsole.class);
   private ConnectedSonarLintEngine engine = mock(ConnectedSonarLintEngine.class);
+  private Module module = mock(Module.class);
+  private ProjectLevelVcsManager projectLevelVcsManager = mock(ProjectLevelVcsManager.class, RETURNS_DEEP_STUBS);
 
   private ServerIssueUpdater underTest;
 
@@ -69,12 +69,21 @@ public class ServerIssueUpdaterTest extends AbstractSonarLintLightTests {
     replaceProjectService(IssueManager.class, issueManager);
     replaceProjectService(SonarLintConsole.class, mockedConsole);
     replaceProjectService(ProjectBindingManager.class, bindingManager);
-    doReturn(engine).when(bindingManager).getConnectedEngine();
+    doReturn(engine).when(bindingManager).getConnectedEngine(PROJECT_KEY);
     underTest = new ServerIssueUpdater(getProject());
     getGlobalSettings().setSonarQubeServers(Collections.singletonList(SonarQubeServer.newBuilder().setName(SERVER_ID).setHostUrl("http://dummyserver:9000").build()));
     getProjectSettings().setServerId(SERVER_ID);
-    getProjectSettings().setProjectKey(PROJECT_KEY);
+    getProjectSettings().setVcsRootMapping(ImmutableMap.of("/project", PROJECT_KEY));
 
+    replaceProjectService(ProjectLevelVcsManager.class, projectLevelVcsManager);
+    VirtualFile moduleFile = mock(VirtualFile.class);
+    when(module.getModuleFile()).thenReturn(moduleFile);
+    when(module.getProject()).thenReturn(getProject());
+    when(projectLevelVcsManager.getVcsRootFor(moduleFile).getCanonicalPath()).thenReturn("/project");
+
+    ModuleBindingManager moduleBindingManager = mock(ModuleBindingManager.class);
+    when(moduleBindingManager.getBinding()).thenReturn(PROJECT_BINDING);
+    when(module.getService(ModuleBindingManager.class)).thenReturn(moduleBindingManager);
   }
 
   @After
@@ -103,7 +112,7 @@ public class ServerIssueUpdaterTest extends AbstractSonarLintLightTests {
     // run
     getProjectSettings().setBindingEnabled(true);
 
-    underTest.fetchAndMatchServerIssues(Collections.singletonMap(getModule(), Collections.singletonList(file)), new EmptyProgressIndicator(), false);
+    underTest.fetchAndMatchServerIssues(Collections.singletonMap(module, Collections.singletonList(file)), new EmptyProgressIndicator(), false);
 
     verify(issueManager, timeout(3000).times(1)).matchWithServerIssues(eq(file), argThat(issues -> issues.size() == 1));
 
@@ -128,7 +137,7 @@ public class ServerIssueUpdaterTest extends AbstractSonarLintLightTests {
     // run
     getProjectSettings().setBindingEnabled(true);
 
-    underTest.fetchAndMatchServerIssues(Collections.singletonMap(getModule(), files), new EmptyProgressIndicator(), false);
+    underTest.fetchAndMatchServerIssues(Collections.singletonMap(module, files), new EmptyProgressIndicator(), false);
 
     verify(issueManager, timeout(3000).times(10)).matchWithServerIssues(any(VirtualFile.class), argThat(issues -> issues.size() == 1));
     verify(engine).downloadServerIssues(any(ServerConfiguration.class), eq(PROJECT_KEY));

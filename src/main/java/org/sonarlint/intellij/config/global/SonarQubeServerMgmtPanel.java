@@ -218,7 +218,7 @@ public class SonarQubeServerMgmtPanel implements Disposable, ConfigurationPanel<
       if (projectSettings.getServerId() != null && deletedServerIds.contains(projectSettings.getServerId())) {
         projectSettings.setBindingEnabled(false);
         projectSettings.setServerId(null);
-        projectSettings.setProjectKey(null);
+        projectSettings.setVcsRootMapping(Collections.emptyMap());
       }
     }
   }
@@ -338,17 +338,22 @@ public class SonarQubeServerMgmtPanel implements Disposable, ConfigurationPanel<
   public static void updateServerBinding(SonarQubeServer server, ConnectedSonarLintEngine engine, boolean onlyProjects) {
     Project[] openProjects = ProjectManager.getInstance().getOpenProjects();
     Map<String, List<Project>> projectsPerModule = new HashMap<>();
+    Map<String, String> vcsRootMapping = new HashMap<>();
 
     for (Project p : openProjects) {
       SonarLintProjectSettings projectSettings = SonarLintUtils.getService(p, SonarLintProjectSettings.class);
-      String projectKey = projectSettings.getProjectKey();
-      if (projectSettings.isBindingEnabled() && server.getName().equals(projectSettings.getServerId()) && projectKey != null) {
-        List<Project> projects = projectsPerModule.computeIfAbsent(projectKey, k -> new ArrayList<>());
-        projects.add(p);
+      if (!projectSettings.getVcsRootMapping().isEmpty()) {
+        // this condition is not pulled up to make merging easy in future.
+        if (projectSettings.isBindingEnabled() && server.getName().equals(projectSettings.getServerId())) {
+          projectSettings.getVcsRootMapping().values().forEach(key -> projectsPerModule.put(key, Collections.singletonList(p)));
+        }
+        vcsRootMapping.putAll(projectSettings.getVcsRootMapping());
       }
+
+
     }
 
-    ServerUpdateTask task = new ServerUpdateTask(engine, server, projectsPerModule, onlyProjects);
+    ServerUpdateTask task = new ServerUpdateTask(engine, server, projectsPerModule, onlyProjects, vcsRootMapping);
     ProgressManager.getInstance().run(task.asBackground());
   }
 
@@ -387,7 +392,7 @@ public class SonarQubeServerMgmtPanel implements Disposable, ConfigurationPanel<
         serverList.setSelectedIndex(serverList.getModel().getSize() - 1);
         serverChangeListener.changed(servers);
         SonarLintEngineManager serverManager = SonarLintUtils.getService(SonarLintEngineManager.class);
-        ServerUpdateTask task = new ServerUpdateTask(serverManager.getConnectedEngine(created.getName()), created, Collections.emptyMap(), false);
+        ServerUpdateTask task = new ServerUpdateTask(serverManager.getConnectedEngine(created.getName()), created, Collections.emptyMap(), false, Collections.emptyMap());
         ProgressManager.getInstance().run(task.asBackground());
       }
     }

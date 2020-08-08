@@ -23,6 +23,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.intellij.ui.components.JBTabbedPane;
 import java.awt.BorderLayout;
+import java.util.LinkedHashMap;
 import java.util.List;
 import javax.swing.JPanel;
 import org.apache.commons.lang.StringUtils;
@@ -62,21 +63,21 @@ public class SonarLintProjectSettingsPanel implements Disposable {
 
   public void load(List<SonarQubeServer> servers, SonarLintProjectSettings projectSettings) {
     propsPanel.setAnalysisProperties(projectSettings.getAdditionalProperties());
-    bindPanel.load(servers, projectSettings.isBindingEnabled(), projectSettings.getServerId(), projectSettings.getProjectKey());
+    bindPanel.load(servers, projectSettings.isBindingEnabled(), projectSettings.getServerId(), "", projectSettings.getVcsRootMapping());
     exclusionsPanel.load(projectSettings);
   }
 
   public void save(SonarLintProjectSettings projectSettings) {
     projectSettings.setAdditionalProperties(propsPanel.getProperties());
     projectSettings.setBindingEnabled(bindPanel.isBindingEnabled());
+    projectSettings.setVcsRootMapping(bindPanel.getVcsRootMapping());
     exclusionsPanel.save(projectSettings);
 
     if (bindPanel.isBindingEnabled()) {
       projectSettings.setServerId(bindPanel.getSelectedStorageId());
-      projectSettings.setProjectKey(bindPanel.getSelectedProjectKey());
     } else {
       projectSettings.setServerId(null);
-      projectSettings.setProjectKey(null);
+      projectSettings.setVcsRootMapping(new LinkedHashMap<>());
     }
   }
 
@@ -90,7 +91,7 @@ public class SonarLintProjectSettingsPanel implements Disposable {
         return true;
       }
 
-      if (!StringUtils.equals(projectSettings.getProjectKey(), bindPanel.getSelectedProjectKey())) {
+      if (!projectSettings.getVcsRootMapping().equals(bindPanel.getVcsRootMapping())) {
         return true;
       }
     }

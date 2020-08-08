@@ -23,12 +23,15 @@ import com.google.common.base.Preconditions;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
+
+import org.jetbrains.annotations.Nullable;
 import org.sonarlint.intellij.config.project.SonarLintProjectSettings;
 import org.sonarlint.intellij.ui.SonarLintConsole;
 import org.sonarlint.intellij.util.ProjectLogOutput;
@@ -46,22 +49,24 @@ import org.sonarsource.sonarlint.core.client.api.connected.ProjectBinding;
 
 class ConnectedSonarLintFacade extends SonarLintFacade {
   private final ConnectedSonarLintEngine sonarlint;
+  private final Module module;
 
-  ConnectedSonarLintFacade(ConnectedSonarLintEngine engine, Project project) {
+  ConnectedSonarLintFacade(ConnectedSonarLintEngine engine, Project project, Module module) {
     super(project);
     Preconditions.checkNotNull(project, "project");
     Preconditions.checkNotNull(project.getBasePath(), "project base path");
     Preconditions.checkNotNull(engine, "engine");
     this.sonarlint = engine;
+    this.module = module;
   }
 
   @Override
   protected AnalysisResults analyze(Path baseDir, Path workDir, Collection<ClientInputFile> inputFiles, Map<String, String> props,
     IssueListener issueListener, ProgressMonitor progressMonitor) {
     ConnectedAnalysisConfiguration config = ConnectedAnalysisConfiguration.builder()
-      .setBaseDir(baseDir)
-      .addInputFiles(inputFiles)
-      .setProjectKey(SonarLintUtils.getService(project, SonarLintProjectSettings.class).getProjectKey())
+            .setBaseDir(baseDir)
+            .addInputFiles(inputFiles)
+            .setProjectKey(resolveProjectKey())
       .putAllExtraProperties(props)
       .build();
     SonarLintConsole console = SonarLintUtils.getService(project, SonarLintConsole.class);
@@ -90,7 +95,7 @@ class ConnectedSonarLintFacade extends SonarLintFacade {
 
   @Override
   public ConnectedRuleDetails ruleDetails(String ruleKey) {
-    return sonarlint.getActiveRuleDetails(ruleKey, SonarLintUtils.getService(project, SonarLintProjectSettings.class).getProjectKey());
+    return sonarlint.getActiveRuleDetails(ruleKey, resolveProjectKey());
   }
 
   @Override
@@ -104,6 +109,11 @@ class ConnectedSonarLintFacade extends SonarLintFacade {
       return details.getHtmlDescription();
     }
     return details.getHtmlDescription() + "<br/><br/>" + extendedDescription;
+  }
+
+  @Nullable
+  private String resolveProjectKey() {
+    return SonarLintProjectSettings.resolveProjectkey(project, module, SonarLintUtils.getService(project, SonarLintProjectSettings.class));
   }
 
 }

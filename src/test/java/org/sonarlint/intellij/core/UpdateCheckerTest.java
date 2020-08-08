@@ -19,6 +19,7 @@
  */
 package org.sonarlint.intellij.core;
 
+import com.google.common.collect.ImmutableMap;
 import com.intellij.openapi.progress.DumbProgressIndicator;
 import java.util.Collections;
 import org.junit.Before;
@@ -50,18 +51,18 @@ public class UpdateCheckerTest extends AbstractSonarLintLightTests {
     replaceProjectService(ProjectBindingManager.class, bindingManager);
     replaceProjectService(SonarLintProjectNotifications.class, notifications);
 
-    getProjectSettings().setProjectKey("key");
+    getProjectSettings().setVcsRootMapping(ImmutableMap.of("/project", "key"));
     getProjectSettings().setServerId("serverId");
     server = createServer();
     when(bindingManager.getSonarQubeServer()).thenReturn(server);
-    when(bindingManager.getConnectedEngine()).thenReturn(engine);
+    when(bindingManager.getConnectedEngine("key")).thenReturn(engine);
 
     updateChecker = new UpdateChecker(getProject());
   }
 
   @Test
   public void do_nothing_if_no_engine() throws InvalidBindingException {
-    when(bindingManager.getConnectedEngine()).thenThrow(new IllegalStateException());
+    when(bindingManager.getConnectedEngine("key")).thenThrow(new IllegalStateException());
     updateChecker.checkForUpdate(DumbProgressIndicator.INSTANCE);
 
     verifyZeroInteractions(engine);

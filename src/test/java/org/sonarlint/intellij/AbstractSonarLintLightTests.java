@@ -21,6 +21,7 @@ package org.sonarlint.intellij;
 
 import com.intellij.lang.Language;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -62,7 +63,6 @@ public abstract class AbstractSonarLintLightTests extends LightPlatformCodeInsig
   @After
   public final void restore() {
     globalSettings.setRules(Collections.emptyList());
-    projectSettings.setProjectKey(null);
     projectSettings.setBindingEnabled(false);
     projectSettings.setFileExclusions(Collections.emptyList());
     moduleSettings.setIdePathPrefix("");
@@ -75,6 +75,14 @@ public abstract class AbstractSonarLintLightTests extends LightPlatformCodeInsig
 
   protected <T> void replaceProjectService(Class<T> clazz, T newInstance) {
     ((ComponentManagerImpl) getProject()).replaceServiceInstance(clazz, newInstance, disposable);
+  }
+
+  protected <T> void replaceProjectComponent(Class<T> clazz, T newInstance) {
+    ((ComponentManagerImpl) getProject()).replaceComponentInstance(clazz, newInstance, disposable);
+  }
+
+  protected <T> void replaceApplicationService(Class<T> clazz, T newInstance) {
+    ((ComponentManagerImpl) ApplicationManager.getApplication()).replaceServiceInstance(clazz, newInstance, disposable);
   }
 
   public SonarLintGlobalSettings getGlobalSettings() {

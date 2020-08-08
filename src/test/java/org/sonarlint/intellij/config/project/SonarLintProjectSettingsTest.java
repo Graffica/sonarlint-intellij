@@ -33,9 +33,6 @@ public class SonarLintProjectSettingsTest {
     settings.setBindingEnabled(true);
     assertThat(settings.isBindingEnabled()).isTrue();
 
-    settings.setProjectKey("project1");
-    assertThat(settings.getProjectKey()).isEqualTo("project1");
-
     settings.setServerId("server1");
     assertThat(settings.getServerId()).isEqualTo("server1");
 

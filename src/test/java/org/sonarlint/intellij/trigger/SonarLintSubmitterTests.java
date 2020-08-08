@@ -41,9 +41,7 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
@@ -60,7 +58,7 @@ public class SonarLintSubmitterTests extends AbstractSonarLintLightTests {
 
   @Before
   public void start() throws InvalidBindingException {
-    when(bindingManager.getFacade()).thenReturn(facade);
+    when(bindingManager.getFacade(any(Module.class), anyBoolean())).thenReturn(facade);
     when(facade.getExcluded(any(Module.class), anyCollection(), any(Predicate.class))).thenReturn(Collections.emptySet());
     getGlobalSettings().setAutoTrigger(true);
     submitter = new SonarLintSubmitter(getProject(), () -> exclusions);

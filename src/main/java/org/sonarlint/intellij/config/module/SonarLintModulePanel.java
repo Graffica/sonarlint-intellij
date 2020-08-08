@@ -43,11 +43,13 @@ public class SonarLintModulePanel {
 
   public void load() {
     SonarLintProjectSettings projectSettings = SonarLintUtils.getService(module.getProject(), SonarLintProjectSettings.class);
-    if (projectSettings.getProjectKey() != null) {
+    String projectkey = SonarLintProjectSettings.resolveProjectkey(module.getProject(), module, projectSettings);
+
+    if (projectkey != null) {
       SonarLintModuleSettings settings = SonarLintUtils.getService(module, SonarLintModuleSettings.class);
       idePathText.setText(settings.getIdePathPrefix());
       sqPathText.setText(settings.getSqPathPrefix());
-      projectKeyText.setText(projectSettings.getProjectKey());
+      projectKeyText.setText(projectkey);
     } else {
       idePathText.setText("");
       sqPathText.setText("");
