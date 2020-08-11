@@ -19,8 +19,8 @@
  */
 package org.sonarlint.intellij.editor;
 
+import com.intellij.codeInsight.intention.HighPriorityAction;
 import com.intellij.codeInsight.intention.IntentionAction;
-import com.intellij.codeInsight.intention.LowPriorityAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.RangeMarker;
 import com.intellij.openapi.project.Project;
@@ -31,7 +31,7 @@ import org.jetbrains.annotations.NotNull;
 import org.sonarlint.intellij.issue.LiveIssue;
 import org.sonarlint.intellij.util.SonarLintUtils;
 
-public class ShowLocationsIntention implements IntentionAction, LowPriorityAction {
+public class ShowLocationsIntention implements IntentionAction, HighPriorityAction {
   private final RangeMarker primaryLocation;
   private final String message;
   private final List<LiveIssue.Flow> flows;
