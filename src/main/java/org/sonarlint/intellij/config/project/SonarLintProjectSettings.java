@@ -140,10 +140,13 @@ public final class SonarLintProjectSettings implements PersistentStateComponent<
               Optional.ofNullable(module).map(m ->
                       Optional.ofNullable(m.getModuleFile())
                               .orElseGet(() -> Arrays.stream(ModuleRootManager.getInstance(m).getContentRoots()).findFirst().orElse(null)))
-                      .map(virtualFile -> {
+                      .flatMap(virtualFile -> {
                         VirtualFile root = ProjectLevelVcsManager.getInstance(project).getVcsRootFor(virtualFile);
-                        return projectSettings.getVcsRootMapping().get(root.getCanonicalPath());
-                      }).orElse(null)).get();
+                        return Optional.ofNullable(projectSettings.getVcsRootMapping().get(root.getCanonicalPath()));
+                      }).orElseGet(() -> {
+                        Logger.getInstance(SonarLintProjectSettings.class).error("No project key found for " + module.getName());
+                        return null;
+              })).get();
     } catch (InterruptedException | ExecutionException e) {
       Logger.getInstance(SonarLintProjectSettings.class).error(e.getMessage(), e);
     }
