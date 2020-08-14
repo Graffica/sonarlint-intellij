@@ -56,7 +56,7 @@ public class ModuleBindingManager {
   public void updateBinding(ConnectedSonarLintEngine engine) {
     String projectKey = resolveProjectKey(module);
     if (projectKey == null) {
-      throw new IllegalStateException("Project is not bound");
+      return;
     }
     List<String> moduleFiles = collectPathsForModule();
     ProjectBinding projectBinding = engine.calculatePathPrefixes(projectKey, moduleFiles);

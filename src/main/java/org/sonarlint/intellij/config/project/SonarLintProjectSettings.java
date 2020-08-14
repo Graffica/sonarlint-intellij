@@ -19,8 +19,6 @@
  */
 package org.sonarlint.intellij.config.project;
 
-import com.intellij.dvcs.repo.Repository;
-import com.intellij.dvcs.repo.VcsRepositoryManager;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
@@ -32,7 +30,6 @@ import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.vcs.ProjectLevelVcsManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.xmlb.XmlSerializerUtil;
-import org.sonarlint.intellij.exception.InvalidBindingException;
 
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -41,6 +38,7 @@ import javax.annotation.Nullable;
 
 @State(name = "SonarLintProjectSettings", storages = {@Storage("sonarlint.xml")})
 public final class SonarLintProjectSettings implements PersistentStateComponent<SonarLintProjectSettings> {
+  private static final Logger LOGGER = Logger.getInstance(SonarLintProjectSettings.class);
 
   private boolean verboseEnabled = false;
   private boolean analysisLogsEnabled = false;
@@ -144,11 +142,11 @@ public final class SonarLintProjectSettings implements PersistentStateComponent<
                         VirtualFile root = ProjectLevelVcsManager.getInstance(project).getVcsRootFor(virtualFile);
                         return Optional.ofNullable(projectSettings.getVcsRootMapping().get(root.getCanonicalPath()));
                       }).orElseGet(() -> {
-                        Logger.getInstance(SonarLintProjectSettings.class).error("No project key found for " + module.getName());
+                        LOGGER.info("No project key found for " + module.getName());
                         return null;
               })).get();
     } catch (InterruptedException | ExecutionException e) {
-      Logger.getInstance(SonarLintProjectSettings.class).error(e.getMessage(), e);
+      LOGGER.error(e.getMessage(), e);
     }
     return null;
   }

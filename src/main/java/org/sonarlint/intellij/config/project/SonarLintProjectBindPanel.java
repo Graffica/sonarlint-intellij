@@ -62,9 +62,7 @@ import org.sonarlint.intellij.util.SonarLintUtils;
 import org.sonarsource.sonarlint.core.client.api.connected.ConnectedSonarLintEngine;
 import org.sonarsource.sonarlint.core.client.api.connected.RemoteProject;
 
-import static java.awt.GridBagConstraints.HORIZONTAL;
-import static java.awt.GridBagConstraints.NONE;
-import static java.awt.GridBagConstraints.WEST;
+import static java.awt.GridBagConstraints.*;
 
 public class SonarLintProjectBindPanel {
   private static final String SERVER_EMPTY_TEXT = "<No connections configured>";
@@ -91,12 +89,11 @@ public class SonarLintProjectBindPanel {
     rootPanel = new JPanel(new BorderLayout());
     bindEnable = new JBCheckBox("Bind project to SonarQube / SonarCloud", true);
     bindEnable.addItemListener(new BindItemListener());
-    createBindPanel();
     vcsRootBindPanel = new SonarLintVcsRootBindPanel(project);
+    createBindPanel();
 
     rootPanel.add(bindEnable, BorderLayout.NORTH);
     rootPanel.add(bindPanel, BorderLayout.CENTER);
-    rootPanel.add(vcsRootBindPanel.getComponent(), BorderLayout.SOUTH);
     return rootPanel;
   }
 
@@ -276,8 +273,8 @@ public class SonarLintProjectBindPanel {
       WEST, HORIZONTAL, insets, 0, 0));
 
     // Consume extra space
-    bindPanel.add(new JPanel(), new GridBagConstraints(0, 2, 3, 1, 0.0, 1.0,
-      WEST, HORIZONTAL, insets, 0, 0));
+    bindPanel.add(vcsRootBindPanel.getComponent(), new GridBagConstraints(0, 2, 3, 1, 1.0, 1.0,
+      WEST, BOTH, insets, 0, 0));
   }
 
   /**
