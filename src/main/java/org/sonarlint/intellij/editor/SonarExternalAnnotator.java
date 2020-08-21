@@ -106,9 +106,10 @@ public class SonarExternalAnnotator extends ExternalAnnotator<SonarExternalAnnot
 
     Annotation annotation = annotationHolder
       .createAnnotation(getSeverity(issue.getSeverity()), textRange, issue.getMessage(), htmlMsg);
-    annotation.registerFix(new DisableRuleQuickFix(issue.getRuleKey()));
+    annotation.registerFix(new ShowRuleDescriptionIntentionAction(issue.getRuleKey()));
+    annotation.registerFix(new DisableRuleIntentionAction(issue.getRuleKey()));
 
-    issue.context().ifPresent(c -> annotation.registerFix(new ShowLocationsIntention(issue)));
+    issue.context().ifPresent(c -> annotation.registerFix(new ShowLocationsIntentionAction(issue, c)));
 
     if (issue.getRange() == null) {
       annotation.setFileLevelAnnotation(true);
@@ -165,7 +166,7 @@ public class SonarExternalAnnotator extends ExternalAnnotator<SonarExternalAnnot
       + "href=\"#sonarissue/" + issue.getRuleKey() + "\""
       + (UIUtil.isUnderDarcula() ? " color=\"7AB4C9\" " : "")
       + ">more...</a> " + shortcut;
-    return XmlStringUtil.wrapInHtml(XmlStringUtil.escapeString("SonarLint: " + issue.getMessage()) + issue.context().map(IssueContext::getDescription).orElse("") + link);
+    return XmlStringUtil.wrapInHtml(XmlStringUtil.escapeString("SonarLint: " + issue.getMessage()) + issue.context().map(IssueContext::getSummaryDescription).orElse("") + link);
   }
 
   /**

@@ -22,6 +22,7 @@ package org.sonarlint.intellij.ui;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleUtil;
+import com.intellij.openapi.options.ShowSettingsUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.IdeBorderFactory;
@@ -40,6 +41,7 @@ import java.util.Hashtable;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.swing.Icon;
 import javax.swing.JComponent;
@@ -48,6 +50,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.event.HyperlinkEvent;
+import javax.swing.event.HyperlinkListener;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.Element;
@@ -59,12 +62,16 @@ import javax.swing.text.html.HTMLEditorKit;
 import javax.swing.text.html.ImageView;
 import javax.swing.text.html.StyleSheet;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.sonarlint.intellij.config.global.SonarLintGlobalConfigurable;
+import org.sonarlint.intellij.config.global.SonarLintGlobalSettings;
 import org.sonarlint.intellij.core.ProjectBindingManager;
 import org.sonarlint.intellij.core.SonarLintFacade;
 import org.sonarlint.intellij.exception.InvalidBindingException;
 import org.sonarlint.intellij.issue.LiveIssue;
 import org.sonarlint.intellij.util.SonarLintUtils;
 import org.sonarsource.sonarlint.core.client.api.common.RuleDetails;
+import org.sonarsource.sonarlint.core.client.api.standalone.StandaloneRuleDetails;
+import org.sonarsource.sonarlint.core.client.api.standalone.StandaloneRuleParam;
 
 public class SonarLintRulePanel {
   private static final Pattern SPACES_BEGINNING_LINE = Pattern.compile("\n(\\p{Blank}*)");
@@ -72,6 +79,7 @@ public class SonarLintRulePanel {
   private final JPanel panel;
   private final HTMLEditorKit kit;
   private JEditorPane editor;
+  private RuleDescriptionHyperLinkListener ruleDescriptionHyperLinkListener;
 
   public SonarLintRulePanel(Project project) {
     this.project = project;
@@ -107,10 +115,13 @@ public class SonarLintRulePanel {
         createTable(rule, builder);
         builder.append("<br />")
           .append(description);
+        if (rule instanceof StandaloneRuleDetails) {
+          builder.append(renderRuleParams((StandaloneRuleDetails) rule));
+        }
         String htmlBody = builder.toString();
         htmlBody = fixPreformatedText(htmlBody);
 
-        updateEditor(htmlBody);
+        updateEditor(htmlBody, rule.getKey());
       } catch (InvalidBindingException e) {
         nothingToDisplay(true);
       }
@@ -152,13 +163,14 @@ public class SonarLintRulePanel {
     panel.revalidate();
   }
 
-  private void updateEditor(String text) {
+  private void updateEditor(String text, String ruleKey) {
     ApplicationManager.getApplication().assertIsDispatchThread();
     if (editor == null) {
       panel.removeAll();
       editor = createEditor();
       panel.add(editor, BorderLayout.CENTER);
     }
+    ruleDescriptionHyperLinkListener.setRuleKey(ruleKey);
 
     SwingHelper.setHtml(editor, text, UIUtil.getLabelForeground());
     editor.setCaretPosition(0);
@@ -171,8 +183,30 @@ public class SonarLintRulePanel {
     newEditor.setBorder(JBUI.Borders.empty(10));
     newEditor.setEditable(false);
     newEditor.setContentType("text/html");
-    newEditor.addHyperlinkListener(e -> {
+    ruleDescriptionHyperLinkListener = new RuleDescriptionHyperLinkListener(project);
+    newEditor.addHyperlinkListener(ruleDescriptionHyperLinkListener);
+    return newEditor;
+  }
+
+  private static class RuleDescriptionHyperLinkListener implements HyperlinkListener {
+    private final Project project;
+    private String ruleKey;
+
+    public RuleDescriptionHyperLinkListener(Project project) {
+      this.project = project;
+    }
+
+    public void setRuleKey(String ruleKey) {
+      this.ruleKey = ruleKey;
+    }
+
+    @Override
+    public void hyperlinkUpdate(HyperlinkEvent e) {
       if (HyperlinkEvent.EventType.ACTIVATED.equals(e.getEventType())) {
+        if (e.getDescription().startsWith("#rule")) {
+          openRuleSettings(ruleKey);
+          return;
+        }
         Desktop desktop = Desktop.getDesktop();
         try {
           desktop.browse(e.getURL().toURI());
@@ -180,9 +214,12 @@ public class SonarLintRulePanel {
           SonarLintConsole.get(project).error("Error opening browser: " + e.getURL(), ex);
         }
       }
-    });
+    }
 
-    return newEditor;
+    private void openRuleSettings(String ruleKey) {
+      SonarLintGlobalConfigurable configurable = new SonarLintGlobalConfigurable();
+      ShowSettingsUtil.getInstance().editConfigurable(project, configurable, () -> configurable.selectRule(ruleKey));
+    }
   }
 
   /**
@@ -227,6 +264,50 @@ public class SonarLintRulePanel {
 
     builder.append(htmlBody.substring(current));
     return builder.toString();
+  }
+
+  private String renderRuleParams(StandaloneRuleDetails ruleDetails) {
+    if (!ruleDetails.paramDetails().isEmpty()) {
+      StyleSheet styleSheet = kit.getStyleSheet();
+
+      styleSheet.addRule(".rule-params { border: none; border-collapse: collapse; padding: 1em }");
+      styleSheet.addRule(".rule-params caption { text-align: left }");
+      styleSheet.addRule(".rule-params .thead td { padding-left: 0; padding-bottom: 1em; font-style: italic }");
+      styleSheet.addRule(".rule-params .tbody th { text-align: right; font-weight: normal; font-family: monospace }");
+      styleSheet.addRule(".rule-params .tbody td { margin-left: 1em; padding-bottom: 1em; }");
+      styleSheet.addRule(".rule-params p { margin: 0 }");
+      styleSheet.addRule(".rule-params small { display: block; margin-top: 2px }");
+
+      return "<table class=\"rule-params\">" +
+        "<caption><h2>Parameters</h2></caption>" +
+        "<tr class='thead'>" +
+        "<td colspan=\"2\">" +
+        "Following parameter values can be set in <a href=\"#rule\">Rule Settings</a>. " +
+        "In connected mode, server side configuration overrides local settings." +
+        "</td>" +
+        "</tr>" +
+        ruleDetails.paramDetails().stream().map(param -> renderRuleParam(param, ruleDetails)).collect(Collectors.joining("\n")) +
+        "</table>";
+    } else {
+      return "";
+    }
+  }
+
+  private static String renderRuleParam(StandaloneRuleParam param, StandaloneRuleDetails ruleDetails) {
+    String paramDescription = param.description() != null ? "<p>" + param.description() + "</p>" : "";
+    SonarLintGlobalSettings globalSettings = SonarLintUtils.getService(SonarLintGlobalSettings.class);
+    String paramDefaultValue = param.defaultValue();
+    String defaultValue = paramDefaultValue != null ? paramDefaultValue : "(none)";
+    String currentValue = globalSettings.getRuleParamValue(ruleDetails.getKey(), param.name()).orElse(defaultValue);
+    return "<tr class='tbody'>" +
+      // The <br/> elements are added to simulate a "vertical-align: top" (not supported by Java 11 CSS renderer)
+      "<th>" + param.name() + "<br/><br/></th>" +
+      "<td>" +
+      paramDescription +
+      "<p><small>Current value: <code>" + currentValue + "</code></small></p>" +
+      "<p><small>Default value: <code>" + defaultValue + "</code></small></p>" +
+      "</td>" +
+      "</tr>";
   }
 
   public JComponent getPanel() {
