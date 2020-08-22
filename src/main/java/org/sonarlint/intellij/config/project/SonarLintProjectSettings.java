@@ -31,18 +31,15 @@ import com.intellij.openapi.vcs.ProjectLevelVcsManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 
-import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.FutureTask;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nullable;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 
 @State(name = "SonarLintProjectSettings", storages = {@Storage("sonarlint.xml")})
 public final class SonarLintProjectSettings implements PersistentStateComponent<SonarLintProjectSettings> {
   private static final Logger LOGGER = Logger.getInstance(SonarLintProjectSettings.class);
-  private static final Executor executor = Executors.newSingleThreadExecutor();
 
   private boolean verboseEnabled = false;
   private boolean analysisLogsEnabled = false;
@@ -136,26 +133,34 @@ public final class SonarLintProjectSettings implements PersistentStateComponent<
     this.vcsRootMapping = new LinkedHashMap<>(vcsRootMapping);
   }
 
-  // TODO: 2020-08-21 optimize the usage of this method, introduce cache and shutdown executor on project close.
   public static String resolveProjectkey(Project project, Module module, SonarLintProjectSettings projectSettings) {
-    try {
-      final FutureTask<String> futureTask = new FutureTask<>(() ->
-              Optional.ofNullable(module).map(m ->
-                      Optional.ofNullable(m.getModuleFile())
-                              .orElseGet(() -> Arrays.stream(ModuleRootManager.getInstance(m).getContentRoots()).findFirst().orElse(null)))
-                      .flatMap(virtualFile -> {
-                        VirtualFile root = ProjectLevelVcsManager.getInstance(project).getVcsRootFor(virtualFile);
-                        return Optional.ofNullable(projectSettings.getVcsRootMapping().get(root.getCanonicalPath()));
-                      }).orElseGet(() -> {
-                LOGGER.info("No project key found for " + module.getName());
-                return null;
-              }));
-      executor.execute(futureTask);
-      return futureTask.get();
-    } catch (InterruptedException | ExecutionException e) {
-      LOGGER.error(e.getMessage(), e);
+    if (ApplicationManager.getApplication().isDispatchThread()) {
+      try {
+        final FutureTask<String> futureTask = new FutureTask<>(() ->
+                resolveKey(project, module, projectSettings));
+        ApplicationManager.getApplication().executeOnPooledThread(futureTask);
+        return futureTask.get();
+      } catch (InterruptedException | ExecutionException e) {
+        LOGGER.error(e.getMessage(), e);
+        return null;
+      }
+    } else {
+      return resolveKey(project, module, projectSettings);
     }
-    return null;
+  }
+
+  @org.jetbrains.annotations.Nullable
+  private static String resolveKey(Project project, Module module, SonarLintProjectSettings projectSettings) {
+    return Optional.ofNullable(module).map(m ->
+            Optional.ofNullable(m.getModuleFile())
+                    .orElseGet(() -> Arrays.stream(ModuleRootManager.getInstance(m).getContentRoots()).findFirst().orElse(null)))
+            .flatMap(virtualFile -> {
+              VirtualFile root = ProjectLevelVcsManager.getInstance(project).getVcsRootFor(virtualFile);
+              return Optional.ofNullable(projectSettings.getVcsRootMapping().get(root.getCanonicalPath()));
+            }).orElseGet(() -> {
+              LOGGER.info("No project key found for " + module.getName());
+              return null;
+            });
   }
 
 }
