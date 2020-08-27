@@ -1,4 +1,7 @@
 #!groovy
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 // The above triggers groovy syntax highlighting in vim
 
 plugins {
@@ -20,6 +23,9 @@ apply plugin: 'idea'
 
 group = 'org.sonarsource.sonarlint_uo.intellij'
 description = 'SonarLint (unofficial) for IntelliJ IDEA'
+if(version.toString().endsWith("SNAPSHOT")) {
+  version = version.toString().replace("SNAPSHOT", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd.HH.mm.ss.SSS")))
+}
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
@@ -177,9 +183,9 @@ bintray {
     name = intellij.pluginName
     setLicenses("LGPL-3.0")
     userOrg = System.getenv("BINTRAY_USER")
-    vcsUrl = "https://github.com/gayanper/${intellij.pluginName}"
+    vcsUrl = "https://github.com/gayanper/sonarlint-intellij"
     version {
-      name = version.toString()
+      name = project.version.toString()
     }
 
     filesSpec {

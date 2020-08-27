@@ -38,7 +38,7 @@ public class SonarLintPlugin {
 
   private IdeaPluginDescriptor getPlugin() {
     if (plugin == null) {
-      plugin = PluginManager.getPlugin(PluginId.getId("org.sonarlint.idea"));
+      plugin = PluginManager.getPlugin(PluginId.getId("org.sonarlint_uo.idea"));
     }
     return plugin;
   }
