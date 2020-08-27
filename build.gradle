@@ -172,21 +172,21 @@ bintray {
   key = System.getenv("BINTRAY_API_KEY")
   publish = true
   override = true
-  pkg(delegateClosureOf {
+  pkg {
     repo = intellij.pluginName
     name = intellij.pluginName
     setLicenses("LGPL-3.0")
     userOrg = System.getenv("BINTRAY_USER")
     vcsUrl = "https://github.com/gayanper/${intellij.pluginName}"
-    version(delegateClosureOf {
+    version {
       name = version.toString()
-    })
+    }
 
-    filesSpec(delegateClosureOf {
+    filesSpec {
       from("build/distributions")
       into(".")
-    })
+    }
 
-  })
+  }
 }
 
