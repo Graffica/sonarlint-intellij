@@ -28,7 +28,6 @@ import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.vcs.ProjectLevelVcsManager;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 
 import javax.annotation.CheckForNull;
@@ -151,16 +150,20 @@ public final class SonarLintProjectSettings implements PersistentStateComponent<
 
   @org.jetbrains.annotations.Nullable
   private static String resolveKey(Project project, Module module, SonarLintProjectSettings projectSettings) {
-    return Optional.ofNullable(module).map(m ->
-            Optional.ofNullable(m.getModuleFile())
-                    .orElseGet(() -> Arrays.stream(ModuleRootManager.getInstance(m).getContentRoots()).findFirst().orElse(null)))
-            .flatMap(virtualFile -> {
-              VirtualFile root = ProjectLevelVcsManager.getInstance(project).getVcsRootFor(virtualFile);
-              return Optional.ofNullable(projectSettings.getVcsRootMapping().get(root.getCanonicalPath()));
-            }).orElseGet(() -> {
-              LOGGER.info("No project key found for " + module.getName());
-              return null;
-            });
+    if (projectSettings.getVcsRootMapping().isEmpty()) {
+      LOGGER.debug("No vcs root mappings");
+      return null;
+    } else {
+      return Optional.ofNullable(module).map(m ->
+              Optional.ofNullable(m.getModuleFile())
+                      .orElseGet(() -> Arrays.stream(ModuleRootManager.getInstance(m).getContentRoots()).findFirst().orElse(null)))
+              .map(virtualFile -> ProjectLevelVcsManager.getInstance(project).getVcsRootFor(virtualFile))
+              .flatMap(root -> Optional.ofNullable(projectSettings.getVcsRootMapping().get(root.getCanonicalPath())))
+              .orElseGet(() -> {
+                LOGGER.info("No project key found for " + module.getName());
+                return null;
+              });
+    }
   }
 
 }

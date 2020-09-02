@@ -23,15 +23,6 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.Supplier;
 import org.sonarlint.intellij.analysis.AnalysisCallback;
 import org.sonarlint.intellij.analysis.LocalFileExclusions;
 import org.sonarlint.intellij.analysis.SonarLintJobManager;
@@ -43,6 +34,9 @@ import org.sonarlint.intellij.exception.InvalidBindingException;
 import org.sonarlint.intellij.ui.SonarLintConsole;
 import org.sonarlint.intellij.util.SonarLintAppUtils;
 import org.sonarlint.intellij.util.SonarLintUtils;
+
+import java.util.*;
+import java.util.function.Supplier;
 
 public class SonarLintSubmitter {
   static final AnalysisCallback NO_OP_CALLBACK = new AnalysisCallback() {
@@ -92,17 +86,13 @@ public class SonarLintSubmitter {
    * @param trigger What triggered the analysis
    */
   public void submitFilesModal(Collection<VirtualFile> files, TriggerType trigger, AnalysisCallback callback) {
-    try {
-      List<VirtualFile> filesToClearIssues = new ArrayList<>();
-      Map<Module, Collection<VirtualFile>> filesByModule = filterAndGetByModule(files, false, filesToClearIssues);
-      if (!files.isEmpty()) {
-        SonarLintConsole console = SonarLintUtils.getService(myProject,SonarLintConsole.class);
-        console.debug("Trigger: " + trigger);
-        SonarLintJobManager sonarLintJobManager = SonarLintUtils.getService(myProject, SonarLintJobManager.class);
-        sonarLintJobManager.submitManual(filesByModule, filesToClearIssues, trigger, true, callback);
-      }
-    } catch (InvalidBindingException e) {
-      // nothing to do, SonarLintEngineManager already showed notification
+    List<VirtualFile> filesToClearIssues = new ArrayList<>();
+    Map<Module, Collection<VirtualFile>> filesByModule = filterAndGetByModule(files, false, filesToClearIssues);
+    if (!files.isEmpty()) {
+      SonarLintConsole console = SonarLintUtils.getService(myProject, SonarLintConsole.class);
+      console.debug("Trigger: " + trigger);
+      SonarLintJobManager sonarLintJobManager = SonarLintUtils.getService(myProject, SonarLintJobManager.class);
+      sonarLintJobManager.submitManual(filesByModule, filesToClearIssues, trigger, true, callback);
     }
   }
 
@@ -120,27 +110,22 @@ public class SonarLintSubmitter {
 
   public void submitFiles(Collection<VirtualFile> files, TriggerType trigger, AnalysisCallback callback, boolean startInBackground) {
     boolean checkExclusions = trigger != TriggerType.ACTION;
-    try {
-      List<VirtualFile> filesToClearIssues = new ArrayList<>();
-      Map<Module, Collection<VirtualFile>> filesByModule = filterAndGetByModule(files, checkExclusions, filesToClearIssues);
+    List<VirtualFile> filesToClearIssues = new ArrayList<>();
+    Map<Module, Collection<VirtualFile>> filesByModule = filterAndGetByModule(files, checkExclusions, filesToClearIssues);
 
-      if (!files.isEmpty()) {
-        SonarLintConsole console = SonarLintUtils.getService(myProject, SonarLintConsole.class);
-        console.debug("Trigger: " + trigger);
-        SonarLintJobManager sonarLintJobManager = SonarLintUtils.getService(myProject, SonarLintJobManager.class);
-        if (startInBackground) {
-          sonarLintJobManager.submitBackground(filesByModule, filesToClearIssues, trigger, callback);
-        } else {
-          sonarLintJobManager.submitManual(filesByModule, filesToClearIssues, trigger, false, callback);
-        }
+    if (!files.isEmpty()) {
+      SonarLintConsole console = SonarLintUtils.getService(myProject, SonarLintConsole.class);
+      console.debug("Trigger: " + trigger);
+      SonarLintJobManager sonarLintJobManager = SonarLintUtils.getService(myProject, SonarLintJobManager.class);
+      if (startInBackground) {
+        sonarLintJobManager.submitBackground(filesByModule, filesToClearIssues, trigger, callback);
+      } else {
+        sonarLintJobManager.submitManual(filesByModule, filesToClearIssues, trigger, false, callback);
       }
-    } catch (InvalidBindingException e) {
-      // nothing to do, SonarLintEngineManager already showed notification
     }
   }
 
-  private Map<Module, Collection<VirtualFile>> filterAndGetByModule(Collection<VirtualFile> files, boolean checkExclusions, List<VirtualFile> filesToClearIssues)
-    throws InvalidBindingException {
+  private Map<Module, Collection<VirtualFile>> filterAndGetByModule(Collection<VirtualFile> files, boolean checkExclusions, List<VirtualFile> filesToClearIssues) {
     Map<Module, Collection<VirtualFile>> filesByModule = new LinkedHashMap<>();
 
     for (VirtualFile file : files) {
@@ -171,8 +156,7 @@ public class SonarLintSubmitter {
     return filesByModule;
   }
 
-  private void filterWithServerExclusions(boolean checkExclusions, List<VirtualFile> filesToClearIssues, Map<Module, Collection<VirtualFile>> filesByModule)
-    throws InvalidBindingException {
+  private void filterWithServerExclusions(boolean checkExclusions, List<VirtualFile> filesToClearIssues, Map<Module, Collection<VirtualFile>> filesByModule) {
     ProjectBindingManager projectBindingManager = SonarLintUtils.getService(myProject, ProjectBindingManager.class);
     // Apply server file exclusions. This is an expensive operation, so we call the core only once per module.
     if (checkExclusions) {
@@ -180,16 +164,21 @@ public class SonarLintSubmitter {
       // resulting in ConcurrentModificationException
       List<Module> modules = new ArrayList<>(filesByModule.keySet());
       for (Module module : modules) {
-        SonarLintFacade sonarLintFacade = projectBindingManager.getFacade(module, true);
-        Collection<VirtualFile> virtualFiles = filesByModule.get(module);
-        VirtualFileTestPredicate testPredicate = SonarLintUtils.getService(module, VirtualFileTestPredicate.class);
-        Collection<VirtualFile> excluded = sonarLintFacade.getExcluded(module, virtualFiles, testPredicate);
-        for (VirtualFile f : excluded) {
-          logExclusion(f, "not automatically analyzed due to exclusions configured in the SonarQube Server");
-          filesToClearIssues.add(f);
-        }
-        virtualFiles.removeAll(excluded);
-        if (virtualFiles.isEmpty()) {
+        try {
+          SonarLintFacade sonarLintFacade = projectBindingManager.getFacade(module, true);
+          Collection<VirtualFile> virtualFiles = filesByModule.get(module);
+          VirtualFileTestPredicate testPredicate = SonarLintUtils.getService(module, VirtualFileTestPredicate.class);
+          Collection<VirtualFile> excluded = sonarLintFacade.getExcluded(module, virtualFiles, testPredicate);
+          for (VirtualFile f : excluded) {
+            logExclusion(f, "not automatically analyzed due to exclusions configured in the SonarQube Server");
+            filesToClearIssues.add(f);
+          }
+          virtualFiles.removeAll(excluded);
+          if (virtualFiles.isEmpty()) {
+            filesByModule.remove(module);
+          }
+        } catch (InvalidBindingException e) {
+          // nothing to do, SonarLintEngineManager already showed notification
           filesByModule.remove(module);
         }
       }

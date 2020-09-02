@@ -25,7 +25,7 @@ import java.util.Map;
 
 public interface AnalysisConfigurator {
   // Name is constructed from plugin-id.extension-point-name
-  ExtensionPointName<AnalysisConfigurator> EP_NAME = ExtensionPointName.create("org.sonarlint.idea.AnalysisConfiguration");
+  ExtensionPointName<AnalysisConfigurator> EP_NAME = ExtensionPointName.create("org.sonarlint_uo.idea.AnalysisConfiguration");
 
   Map<String, String> configure(Module module);
 }
