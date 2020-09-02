@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugins>
+    <plugin id="org.sonarlint_uo.idea" url="https://dl.bintray.com/gayanper/sonarlint_uo-intellij/$filename$" version="">
+        <idea-version since-build="183.2940.10" until-build="203.*" />
+    </plugin>
+</plugins>
