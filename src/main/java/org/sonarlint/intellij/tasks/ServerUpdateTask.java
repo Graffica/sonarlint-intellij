@@ -19,7 +19,6 @@
  */
 package org.sonarlint.intellij.tasks;
 
-import com.google.common.collect.Maps;
 import com.intellij.history.utils.RunnableAdapter;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
@@ -31,15 +30,6 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
-
-import java.util.Collection;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import org.jetbrains.annotations.NotNull;
 import org.sonarlint.intellij.config.global.SonarQubeServer;
 import org.sonarlint.intellij.core.ModuleBindingManager;
@@ -58,18 +48,25 @@ import org.sonarsource.sonarlint.core.client.api.connected.UpdateResult;
 import org.sonarsource.sonarlint.core.client.api.exceptions.CanceledException;
 import org.sonarsource.sonarlint.core.plugin.Version;
 
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 public class ServerUpdateTask {
   private static final Logger LOGGER = Logger.getInstance(ServerUpdateTask.class);
   private final ConnectedSonarLintEngine engine;
   private final SonarQubeServer server;
-  private final Map<String, List<Project>> projectsPerProjectKey;
+  private final Map<String, Project> projectPerProjectKey;
   private final boolean onlyModules;
   private final Map<String, String> vcsRootMapping;
 
-  public ServerUpdateTask(ConnectedSonarLintEngine engine, SonarQubeServer server, Map<String, List<Project>> projectsPerProjectKey, boolean onlyModules, Map<String, String> vcsRootMapping) {
+  public ServerUpdateTask(ConnectedSonarLintEngine engine, SonarQubeServer server, Map<String, Project> projectPerProjectKey, boolean onlyModules, Map<String, String> vcsRootMapping) {
     this.engine = engine;
     this.server = server;
-    this.projectsPerProjectKey = projectsPerProjectKey;
+    this.projectPerProjectKey = projectPerProjectKey;
     this.onlyModules = onlyModules;
     this.vcsRootMapping = vcsRootMapping;
   }
@@ -156,15 +153,12 @@ public class ServerUpdateTask {
    */
   private void updateProjects(ServerConfiguration serverConfiguration, TaskProgressMonitor monitor) {
     Set<String> failedProjects = new LinkedHashSet<>();
-    for (Map.Entry<String, List<Project>> entry : projectsPerProjectKey.entrySet()) {
+    for (Map.Entry<String, Project> entry : projectPerProjectKey.entrySet()) {
       try {
-        if (vcsRootMapping.isEmpty()) {
-          updateProject(serverConfiguration, entry.getKey(), entry.getValue(), monitor);
-        } else {
-          Map<String, String> keyToRoot = vcsRootMapping.entrySet().stream().collect(Collectors.toMap(e -> e.getValue(), e -> e.getKey()));
-          for (Project project : entry.getValue()) {
-            updateVCSModules(serverConfiguration, entry.getKey(), keyToRoot.get(entry.getKey()), project, monitor);
-          }
+        if (!vcsRootMapping.isEmpty()) {
+          Map<String, String> keyToRoot = vcsRootMapping.entrySet().stream().collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+          updateVCSModules(serverConfiguration, entry.getKey(), keyToRoot.get(entry.getKey()), entry.getValue(), monitor);
+          analyzeOpenFiles(entry.getValue());
         }
       } catch (Throwable e) {
         // in case of error, save project key and keep updating other projects
@@ -173,25 +167,19 @@ public class ServerUpdateTask {
       }
     }
 
-    if (!projectsPerProjectKey.isEmpty() && !failedProjects.isEmpty()) {
+    if (!projectPerProjectKey.isEmpty() && !failedProjects.isEmpty()) {
       String errorMsg = "Failed to update the following projects. "
-        + "Please check if the server bindings are updated and the module key is correct: "
-        + failedProjects.toString();
+              + "Please check if the server bindings are updated and the module key is correct: "
+              + failedProjects.toString();
       GlobalLogOutput.get().log(errorMsg, LogOutput.Level.WARN);
 
       ApplicationManager.getApplication().invokeLater(new RunnableAdapter() {
-        @Override public void doRun() {
+        @Override
+        public void doRun() {
           Messages.showWarningDialog((Project) null, errorMsg, "Projects Not Updated");
         }
       }, ModalityState.any());
     }
-  }
-
-  private void updateProject(ServerConfiguration serverConfiguration, String projectKey, List<Project> projects, TaskProgressMonitor monitor) {
-    engine.updateProject(serverConfiguration, projectKey, monitor);
-    GlobalLogOutput.get().log("Project '" + projectKey + "' in server binding '" + server.getName() + "' updated", LogOutput.Level.INFO);
-    projects.forEach(this::updateModules);
-    projects.forEach(ServerUpdateTask::analyzeOpenFiles);
   }
 
   private void updateVCSModules(ServerConfiguration serverConfiguration, String projectKey, String vcsRoot, Project project, TaskProgressMonitor monitor) {
@@ -202,7 +190,6 @@ public class ServerUpdateTask {
       Stream.of(ModuleManager.getInstance(project).getModules())
               .filter(module -> module.getModuleFilePath().startsWith(vcsRoot))
               .forEach(module -> SonarLintUtils.getService(module, ModuleBindingManager.class).updateBinding(engine));
-      analyzeOpenFiles(project);
     }
   }
 

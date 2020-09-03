@@ -20,7 +20,6 @@
 package org.sonarlint.intellij.config.project;
 
 import com.google.common.base.Predicates;
-import com.google.common.base.Strings;
 import com.intellij.ide.DataManager;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.application.ApplicationManager;
@@ -29,16 +28,6 @@ import com.intellij.openapi.options.ex.Settings;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.messages.MessageBusConnection;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import javax.annotation.Nullable;
-import javax.swing.JComponent;
-
 import org.jetbrains.annotations.Nls;
 import org.sonarlint.intellij.config.global.SonarLintGlobalConfigurable;
 import org.sonarlint.intellij.config.global.SonarLintGlobalSettings;
@@ -53,6 +42,13 @@ import org.sonarlint.intellij.trigger.SonarLintSubmitter;
 import org.sonarlint.intellij.trigger.TriggerType;
 import org.sonarlint.intellij.util.SonarLintUtils;
 import org.sonarsource.sonarlint.core.client.api.connected.ConnectedSonarLintEngine;
+
+import javax.annotation.Nullable;
+import javax.swing.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Coordinates creation of models and visual components from persisted settings.
@@ -128,8 +124,8 @@ public class SonarLintProjectConfigurable implements Configurable, Configurable.
         List<String> projectKeys = new ArrayList<>();
         projectKeys.addAll(projectSettings.getVcsRootMapping()
                 .values().stream().filter(Predicates.not(String::isEmpty)).collect(Collectors.toList()));
-        Map<String, List<Project>> projectMap = projectKeys.stream()
-                .collect(Collectors.toMap(o -> o, s -> Collections.singletonList(project)));
+        Map<String, Project> projectMap = projectKeys.stream()
+                .collect(Collectors.toMap(o -> o, s -> project));
 
         ServerUpdateTask task = new ServerUpdateTask(engine, server, projectMap, true, projectSettings.getVcsRootMapping());
         ProgressManager.getInstance().run(task.asModal());

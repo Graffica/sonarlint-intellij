@@ -30,46 +30,12 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.Splitter;
-import com.intellij.ui.AnActionButton;
-import com.intellij.ui.AnActionButtonRunnable;
-import com.intellij.ui.CollectionListModel;
-import com.intellij.ui.ColoredListCellRenderer;
-import com.intellij.ui.HyperlinkAdapter;
-import com.intellij.ui.HyperlinkLabel;
-import com.intellij.ui.IdeBorderFactory;
-import com.intellij.ui.SimpleTextAttributes;
-import com.intellij.ui.ToolbarDecorator;
+import com.intellij.ui.*;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBList;
 import com.intellij.util.ui.JBUI;
 import icons.SonarLintIcons;
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-import javax.annotation.Nullable;
-import javax.swing.AbstractAction;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.SwingConstants;
-import javax.swing.border.Border;
-import javax.swing.event.HyperlinkEvent;
 import org.sonarlint.intellij.config.ConfigurationPanel;
 import org.sonarlint.intellij.config.global.wizard.SQServerWizard;
 import org.sonarlint.intellij.config.project.SonarLintProjectSettings;
@@ -81,6 +47,18 @@ import org.sonarsource.sonarlint.core.client.api.connected.ConnectedSonarLintEng
 import org.sonarsource.sonarlint.core.client.api.connected.GlobalStorageStatus;
 import org.sonarsource.sonarlint.core.client.api.connected.StateListener;
 import org.sonarsource.sonarlint.core.client.api.util.DateUtils;
+
+import javax.annotation.Nullable;
+import javax.swing.*;
+import javax.swing.border.Border;
+import javax.swing.event.HyperlinkEvent;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class SonarQubeServerMgmtPanel implements Disposable, ConfigurationPanel<SonarLintGlobalSettings> {
   private static final String LABEL_NO_SERVERS = "Add a connection to SonarQube or SonarCloud";
@@ -337,7 +315,7 @@ public class SonarQubeServerMgmtPanel implements Disposable, ConfigurationPanel<
 
   public static void updateServerBinding(SonarQubeServer server, ConnectedSonarLintEngine engine, boolean onlyProjects) {
     Project[] openProjects = ProjectManager.getInstance().getOpenProjects();
-    Map<String, List<Project>> projectsPerModule = new HashMap<>();
+    Map<String, Project> projectsPerModule = new HashMap<>();
     Map<String, String> vcsRootMapping = new HashMap<>();
 
     for (Project p : openProjects) {
@@ -345,7 +323,7 @@ public class SonarQubeServerMgmtPanel implements Disposable, ConfigurationPanel<
       if (!projectSettings.getVcsRootMapping().isEmpty()) {
         // this condition is not pulled up to make merging easy in future.
         if (projectSettings.isBindingEnabled() && server.getName().equals(projectSettings.getServerId())) {
-          projectSettings.getVcsRootMapping().values().forEach(key -> projectsPerModule.put(key, Collections.singletonList(p)));
+          projectSettings.getVcsRootMapping().values().forEach(key -> projectsPerModule.put(key, p));
         }
         vcsRootMapping.putAll(projectSettings.getVcsRootMapping());
       }
