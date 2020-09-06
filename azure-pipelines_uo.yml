@@ -10,6 +10,8 @@ pool:
   vmImage: 'ubuntu-latest'
 
 steps:
+- bash: sudo apt -y install curl
+  
 - task: Gradle@2
   env:
     BINTRAY_USER: $(BINTRAY_USER)
