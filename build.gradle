@@ -217,7 +217,7 @@ buildPlugin {
       into ('build/distributions')
     }
     def plugins = (new XmlParser()).parse('build/distributions/updatePlugins.xml')
-    plugins.plugin[0]['@url'] = plugins.plugin[0]['@url'].replace('$filename$', "sonarlint-intellij-4.12-${project.version}.zip")
+    plugins.plugin[0]['@url'] = plugins.plugin[0]['@url'].replace('$filename$', "${intellij.pluginName}-${project.version}.zip")
     plugins.plugin[0]['@version'] = project.version
     new XmlNodePrinter(new PrintWriter(new FileWriter('build/distributions/updatePlugins.xml'))).print(plugins)
   }
