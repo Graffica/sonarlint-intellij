@@ -63,7 +63,6 @@ import javax.swing.text.html.ImageView;
 import javax.swing.text.html.StyleSheet;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.sonarlint.intellij.config.global.SonarLintGlobalConfigurable;
-import org.sonarlint.intellij.config.global.SonarLintGlobalSettings;
 import org.sonarlint.intellij.core.ProjectBindingManager;
 import org.sonarlint.intellij.core.SonarLintFacade;
 import org.sonarlint.intellij.exception.InvalidBindingException;
@@ -72,6 +71,8 @@ import org.sonarlint.intellij.util.SonarLintUtils;
 import org.sonarsource.sonarlint.core.client.api.common.RuleDetails;
 import org.sonarsource.sonarlint.core.client.api.standalone.StandaloneRuleDetails;
 import org.sonarsource.sonarlint.core.client.api.standalone.StandaloneRuleParam;
+
+import static org.sonarlint.intellij.config.Settings.getGlobalSettings;
 
 public class SonarLintRulePanel {
   private static final Pattern SPACES_BEGINNING_LINE = Pattern.compile("\n(\\p{Blank}*)");
@@ -101,7 +102,7 @@ public class SonarLintRulePanel {
       try {
         Module module = ModuleUtil.findModuleForFile(issue.psiFile());
         SonarLintFacade facade = SonarLintUtils.getService(project, ProjectBindingManager.class).getFacade(module, true);
-        RuleDetails rule = facade.ruleDetails(issue.getRuleKey());
+        RuleDetails rule = facade.getActiveRuleDetails(issue.getRuleKey());
         String description = facade.getDescription(issue.getRuleKey());
         if (rule == null || description == null) {
           nothingToDisplay(true);
@@ -295,10 +296,9 @@ public class SonarLintRulePanel {
 
   private static String renderRuleParam(StandaloneRuleParam param, StandaloneRuleDetails ruleDetails) {
     String paramDescription = param.description() != null ? "<p>" + param.description() + "</p>" : "";
-    SonarLintGlobalSettings globalSettings = SonarLintUtils.getService(SonarLintGlobalSettings.class);
     String paramDefaultValue = param.defaultValue();
     String defaultValue = paramDefaultValue != null ? paramDefaultValue : "(none)";
-    String currentValue = globalSettings.getRuleParamValue(ruleDetails.getKey(), param.name()).orElse(defaultValue);
+    String currentValue = getGlobalSettings().getRuleParamValue(ruleDetails.getKey(), param.name()).orElse(defaultValue);
     return "<tr class='tbody'>" +
       // The <br/> elements are added to simulate a "vertical-align: top" (not supported by Java 11 CSS renderer)
       "<th>" + param.name() + "<br/><br/></th>" +
@@ -368,8 +368,8 @@ public class SonarLintRulePanel {
       }
 
       // in presentation mode we don't want huge icons
-      if (JBUI.isHiDPI()) {
-        icon = IconUtil.scale(icon, 0.5);
+      if (JBUI.isUsrHiDPI()) {
+        icon = IconUtil.scale(icon, null, 0.5f);
       }
       Dictionary<URL, Image> cache = (Dictionary<URL, Image>) getDocument().getProperty("imageCache");
       if (cache == null) {

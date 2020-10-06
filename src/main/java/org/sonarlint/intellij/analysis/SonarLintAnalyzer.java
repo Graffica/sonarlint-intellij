@@ -23,6 +23,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.TestSourcesFilter;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.encoding.EncodingProjectManager;
 import java.nio.charset.Charset;
@@ -68,8 +69,7 @@ public class SonarLintAnalyzer {
     }
 
     // configure files
-    VirtualFileTestPredicate testPredicate = SonarLintUtils.getService(module, VirtualFileTestPredicate.class);
-    List<ClientInputFile> inputFiles = getInputFiles(module, testPredicate, filesToAnalyze);
+    List<ClientInputFile> inputFiles = getInputFiles(module, filesToAnalyze);
 
     // Analyze
 
@@ -89,10 +89,11 @@ public class SonarLintAnalyzer {
       console.debug("Done in " + (System.currentTimeMillis() - start) + "ms\n");
       SonarLintTelemetry telemetry = SonarLintUtils.getService(SonarLintTelemetry.class);
       if (result.languagePerFile().size() == 1 && result.failedAnalysisFiles().isEmpty()) {
-        telemetry.analysisDoneOnSingleFile(result.languagePerFile().values().iterator().next(), (int) (System.currentTimeMillis() - start));
+        telemetry.analysisDoneOnSingleLanguage(result.languagePerFile().values().iterator().next(), (int) (System.currentTimeMillis() - start));
       } else {
         telemetry.analysisDoneOnMultipleFiles();
       }
+
       return result;
     } catch (InvalidBindingException e) {
       // should not happen, as analysis should not have been submitted in this case.
@@ -100,17 +101,17 @@ public class SonarLintAnalyzer {
     }
   }
 
-  private List<ClientInputFile> getInputFiles(Module module, VirtualFileTestPredicate testPredicate, Collection<VirtualFile> filesToAnalyze) {
+  private List<ClientInputFile> getInputFiles(Module module, Collection<VirtualFile> filesToAnalyze) {
     return ApplicationManager.getApplication().<List<ClientInputFile>>runReadAction(() -> filesToAnalyze.stream()
-      .map(f -> createClientInputFile(module, f, testPredicate))
+      .map(f -> createClientInputFile(module, f))
       .filter(Objects::nonNull)
       .collect(Collectors.toList())
     );
   }
 
   @CheckForNull
-  private ClientInputFile createClientInputFile(Module module, VirtualFile virtualFile, VirtualFileTestPredicate testPredicate) {
-    boolean test = testPredicate.test(virtualFile);
+  private ClientInputFile createClientInputFile(Module module, VirtualFile virtualFile) {
+    boolean test = TestSourcesFilter.isTestSources(virtualFile, module.getProject());
     Charset charset = getEncoding(virtualFile);
     String relativePath = SonarLintAppUtils.getRelativePathForAnalysis(module, virtualFile);
     if (relativePath != null) {

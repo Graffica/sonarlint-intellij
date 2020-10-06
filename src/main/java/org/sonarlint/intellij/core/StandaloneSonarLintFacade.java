@@ -31,7 +31,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
-import org.sonarlint.intellij.config.global.SonarLintGlobalSettings;
 import org.sonarlint.intellij.ui.SonarLintConsole;
 import org.sonarlint.intellij.util.ProjectLogOutput;
 import org.sonarlint.intellij.util.SonarLintUtils;
@@ -44,6 +43,8 @@ import org.sonarsource.sonarlint.core.client.api.common.analysis.IssueListener;
 import org.sonarsource.sonarlint.core.client.api.standalone.StandaloneAnalysisConfiguration;
 import org.sonarsource.sonarlint.core.client.api.standalone.StandaloneRuleDetails;
 import org.sonarsource.sonarlint.core.client.api.standalone.StandaloneSonarLintEngine;
+
+import static org.sonarlint.intellij.config.Settings.getGlobalSettings;
 
 final class StandaloneSonarLintFacade extends SonarLintFacade {
   private final StandaloneSonarLintEngine sonarlint;
@@ -62,8 +63,7 @@ final class StandaloneSonarLintFacade extends SonarLintFacade {
     List<RuleKey> excluded = new ArrayList<>();
     List<RuleKey> included = new ArrayList<>();
     Map<RuleKey, Map<String, String>> params = new HashMap<>();
-    SonarLintGlobalSettings globalSettings = SonarLintUtils.getService(SonarLintGlobalSettings.class);
-    globalSettings.getRulesByKey().forEach((k, v) -> {
+    getGlobalSettings().getRulesByKey().forEach((k, v) -> {
       RuleKey key = RuleKey.parse(k);
       if (v.isActive()) {
         included.add(key);
@@ -84,7 +84,9 @@ final class StandaloneSonarLintFacade extends SonarLintFacade {
 
     SonarLintConsole console = SonarLintUtils.getService(project, SonarLintConsole.class);
     console.debug("Starting analysis with configuration:\n" + config.toString());
-    return sonarlint.analyze(config, issueListener, new ProjectLogOutput(project), progressMonitor);
+    final AnalysisResults analysisResults = sonarlint.analyze(config, issueListener, new ProjectLogOutput(project), progressMonitor);
+    AnalysisRequirementNotifications.notifyOnceForSkippedPlugins(analysisResults, sonarlint.getPluginDetails(), project);
+    return analysisResults;
   }
 
   @Override
@@ -93,18 +95,18 @@ final class StandaloneSonarLintFacade extends SonarLintFacade {
   }
 
   @Override
-  public Collection<PluginDetails> getLoadedAnalyzers() {
+  public Collection<PluginDetails> getPluginDetails() {
     return sonarlint.getPluginDetails();
   }
 
   @Override
-  public StandaloneRuleDetails ruleDetails(String ruleKey) {
+  public StandaloneRuleDetails getActiveRuleDetails(String ruleKey) {
     return sonarlint.getRuleDetails(ruleKey).orElse(null);
   }
 
   @Override
   public String getDescription(String ruleKey) {
-    StandaloneRuleDetails details = ruleDetails(ruleKey);
+    StandaloneRuleDetails details = getActiveRuleDetails(ruleKey);
     if (details == null) {
       return null;
     }

@@ -38,6 +38,9 @@ import org.sonarlint.intellij.ui.SonarLintConsole;
 import org.sonarlint.intellij.util.SonarLintUtils;
 import org.sonarsource.sonarlint.core.client.api.connected.ConnectedSonarLintEngine;
 
+import static org.sonarlint.intellij.config.Settings.getGlobalSettings;
+import static org.sonarlint.intellij.config.Settings.getSettingsFor;
+
 public class ProjectBindingManager {
   private final Project myProject;
   private final Supplier<SonarLintEngineManager> engineManagerSupplier;
@@ -68,18 +71,18 @@ public class ProjectBindingManager {
 
   public synchronized SonarLintFacade getFacade(Module module, boolean logDetails) throws InvalidBindingException {
     SonarLintEngineManager engineManager = this.engineManagerSupplier.get();
-    SonarLintProjectSettings projectSettings = SonarLintUtils.getService(myProject, SonarLintProjectSettings.class);
+    SonarLintProjectSettings projectSettings = getSettingsFor(myProject);
     SonarLintProjectNotifications notifications = SonarLintUtils.getService(myProject, SonarLintProjectNotifications.class);
     SonarLintConsole console = SonarLintUtils.getService(myProject, SonarLintConsole.class);
     if (projectSettings.isBindingEnabled()) {
-      String serverId = projectSettings.getServerId();
+      String connectionId = projectSettings.getServerId();
       String projectKey = SonarLintProjectSettings.resolveProjectkey(myProject, module, projectSettings);
-      checkBindingStatus(notifications, serverId, projectKey);
+      checkBindingStatus(notifications, connectionId, projectKey);
       if (logDetails) {
-        console.info(String.format("Using configuration of '%s' in server '%s'", projectKey, serverId));
+        console.info(String.format("Using connection '%s' for project '%s'", connectionId, projectKey));
       }
-      ConnectedSonarLintEngine engine = engineManager.getConnectedEngine(notifications, serverId, projectKey);
-      return new ConnectedSonarLintFacade(engine, myProject, module);
+      ConnectedSonarLintEngine engine = engineManager.getConnectedEngine(notifications, connectionId, projectKey);
+      return new ConnectedSonarLintFacade(connectionId, engine, myProject, module);
     }
 
     return new StandaloneSonarLintFacade(myProject, engineManager.getStandaloneEngine());
@@ -87,12 +90,11 @@ public class ProjectBindingManager {
 
   public synchronized ConnectedSonarLintEngine getConnectedEngineSkipChecks() {
     SonarLintEngineManager engineManager = this.engineManagerSupplier.get();
-    SonarLintProjectSettings projectSettings = SonarLintUtils.getService(myProject, SonarLintProjectSettings.class);
-    return engineManager.getConnectedEngine(projectSettings.getServerId());
+    return engineManager.getConnectedEngine(getSettingsFor(myProject).getServerId());
   }
 
   public synchronized ConnectedSonarLintEngine getConnectedEngine(String projectKey) throws InvalidBindingException {
-    SonarLintProjectSettings projectSettings = SonarLintUtils.getService(myProject, SonarLintProjectSettings.class);
+    SonarLintProjectSettings projectSettings = getSettingsFor(myProject);
     if (!projectSettings.isBindingEnabled()) {
       throw new IllegalStateException("Project is not bound to a SonarQube project");
     }
@@ -105,10 +107,8 @@ public class ProjectBindingManager {
   }
 
   public synchronized SonarQubeServer getSonarQubeServer() throws InvalidBindingException {
-    SonarLintProjectSettings projectSettings = SonarLintUtils.getService(myProject, SonarLintProjectSettings.class);
-    String serverId = projectSettings.getServerId();
-    SonarLintGlobalSettings globalSettings = SonarLintUtils.getService(SonarLintGlobalSettings.class);
-    List<SonarQubeServer> servers = globalSettings.getSonarQubeServers();
+    String serverId = getSettingsFor(myProject).getServerId();
+    List<SonarQubeServer> servers = getGlobalSettings().getSonarQubeServers();
 
     Optional<SonarQubeServer> server = servers.stream().filter(s -> s.getName().equals(serverId)).findAny();
     return server.orElseThrow(() -> new InvalidBindingException("SonarQube server configuration does not exist for server id: " + serverId));

@@ -35,12 +35,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.sonarlint.intellij.AbstractSonarLintLightTests;
-import org.sonarlint.intellij.config.global.SonarLintGlobalSettings;
 import org.sonarlint.intellij.config.global.SonarQubeServer;
-import org.sonarlint.intellij.config.project.SonarLintProjectSettings;
 import org.sonarlint.intellij.exception.InvalidBindingException;
 import org.sonarlint.intellij.ui.SonarLintConsole;
-import org.sonarlint.intellij.util.SonarLintUtils;
 import org.sonarsource.sonarlint.core.client.api.connected.ConnectedSonarLintEngine;
 import org.sonarsource.sonarlint.core.client.api.standalone.StandaloneSonarLintEngine;
 
@@ -65,7 +62,6 @@ public class ProjectBindingManagerTest extends AbstractSonarLintLightTests {
   public void before() throws InvalidBindingException {
     SonarLintConsole console = mock(SonarLintConsole.class);
     SonarLintProjectNotifications notifications = mock(SonarLintProjectNotifications.class);
-    replaceProjectService(SonarLintProjectSettings.class, getProjectSettings());
     replaceProjectService(SonarLintConsole.class, console);
     replaceProjectService(SonarLintProjectNotifications.class, notifications);
 
@@ -113,25 +109,23 @@ public class ProjectBindingManagerTest extends AbstractSonarLintLightTests {
 
   @Test
   public void should_find_sq_server() throws InvalidBindingException {
-    SonarLintGlobalSettings globalSettings = SonarLintUtils.getService(SonarLintGlobalSettings.class);
     getProjectSettings().setBindingEnabled(true);
     getProjectSettings().setVcsRootMapping(ImmutableMap.of("/project", "project1"));
     getProjectSettings().setServerId("server1");
 
     SonarQubeServer server = SonarQubeServer.newBuilder().setName("server1").build();
-    globalSettings.setSonarQubeServers(Collections.singletonList(server));
+    getGlobalSettings().setSonarQubeServers(Collections.singletonList(server));
     assertThat(projectBindingManager.getSonarQubeServer()).isEqualTo(server);
   }
 
   @Test
   public void fail_if_cant_find_server() throws InvalidBindingException {
-    SonarLintGlobalSettings globalSettings = SonarLintUtils.getService(SonarLintGlobalSettings.class);
     getProjectSettings().setBindingEnabled(true);
     getProjectSettings().setVcsRootMapping(ImmutableMap.of("/project", "project1"));
     getProjectSettings().setServerId("server1");
 
     SonarQubeServer server = SonarQubeServer.newBuilder().setName("server2").build();
-    globalSettings.setSonarQubeServers(Collections.singletonList(server));
+    getGlobalSettings().setSonarQubeServers(Collections.singletonList(server));
     exception.expect(InvalidBindingException.class);
     projectBindingManager.getSonarQubeServer();
   }

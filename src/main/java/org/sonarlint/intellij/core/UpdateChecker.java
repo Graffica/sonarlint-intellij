@@ -41,6 +41,8 @@ import org.sonarsource.sonarlint.core.client.api.connected.ConnectedSonarLintEng
 import org.sonarsource.sonarlint.core.client.api.connected.ServerConfiguration;
 import org.sonarsource.sonarlint.core.client.api.connected.StorageUpdateCheckResult;
 
+import static org.sonarlint.intellij.config.Settings.getSettingsFor;
+
 public class UpdateChecker implements Disposable {
 
   private final Project myProject;
@@ -66,7 +68,7 @@ public class UpdateChecker implements Disposable {
 
   void checkForUpdate(@NotNull ProgressIndicator progressIndicator) {
     ProjectBindingManager projectBindingManager = SonarLintUtils.getService(myProject, ProjectBindingManager.class);
-    SonarLintProjectSettings projectSettings = SonarLintUtils.getService(myProject, SonarLintProjectSettings.class);
+    SonarLintProjectSettings projectSettings = getSettingsFor(myProject);
     Map<String, String> vcsRootMapping = projectSettings.getVcsRootMapping();
     GlobalLogOutput log = SonarLintUtils.getService(GlobalLogOutput.class);
 
@@ -104,7 +106,7 @@ public class UpdateChecker implements Disposable {
   }
 
   private void checkForProjectUpdates(List<String> changelog, ConnectedSonarLintEngine engine, ServerConfiguration serverConfiguration, ProgressIndicator indicator) {
-    SonarLintProjectSettings projectSettings = SonarLintUtils.getService(myProject, SonarLintProjectSettings.class);
+    SonarLintProjectSettings projectSettings = getSettingsFor(myProject);
     projectSettings.getVcsRootMapping().values().forEach(projectKey -> {
       StorageUpdateCheckResult projectUpdateCheckResult = engine.checkIfProjectStorageNeedUpdate(serverConfiguration, projectKey,
               new TaskProgressMonitor(indicator, myProject));

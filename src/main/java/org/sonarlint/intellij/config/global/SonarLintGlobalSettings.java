@@ -19,17 +19,12 @@
  */
 package org.sonarlint.intellij.config.global;
 
-import com.intellij.openapi.application.PathManager;
-import com.intellij.openapi.components.ExportableApplicationComponent;
-import com.intellij.openapi.components.PersistentStateComponent;
-import com.intellij.openapi.components.State;
-import com.intellij.openapi.components.Storage;
-import com.intellij.util.xmlb.XmlSerializerUtil;
 import com.intellij.util.xmlb.annotations.Attribute;
 import com.intellij.util.xmlb.annotations.Transient;
 import com.intellij.util.xmlb.annotations.XCollection;
 import com.intellij.util.xmlb.annotations.XMap;
-import java.io.File;
+import org.sonarlint.intellij.util.SonarLintUtils;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,15 +37,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.jetbrains.annotations.NonNls;
-import org.jetbrains.annotations.NotNull;
-import org.sonarlint.intellij.util.SonarLintBundle;
-import org.sonarlint.intellij.util.SonarLintUtils;
 
-@State(name = "SonarLintGlobalSettings", storages = {@Storage("sonarlint.xml")})
-public final class SonarLintGlobalSettings implements PersistentStateComponent<SonarLintGlobalSettings>, ExportableApplicationComponent {
+public final class SonarLintGlobalSettings {
 
   private boolean autoTrigger = true;
+  private String nodejsPath;
   private List<SonarQubeServer> servers = new LinkedList<>();
   private List<String> fileExclusions = new LinkedList<>();
   @Deprecated
@@ -58,9 +49,9 @@ public final class SonarLintGlobalSettings implements PersistentStateComponent<S
   @Deprecated
   private Set<String> excludedRules;
   @XCollection(propertyElementName = "rules", elementName = "rule")
-  private Collection<Rule> rules = new HashSet<>();
+  Collection<Rule> rules = new HashSet<>();
   @Transient
-  private Map<String, Rule> rulesByKey = new HashMap<>();
+  Map<String, Rule> rulesByKey = new HashMap<>();
 
   public void setRuleParam(String ruleKey, String paramName, String paramValue) {
     rulesByKey.computeIfAbsent(ruleKey, s -> new Rule(ruleKey, true)).getParams().put(paramName, paramValue);
@@ -95,39 +86,8 @@ public final class SonarLintGlobalSettings implements PersistentStateComponent<S
     }
   }
 
-  @Override
-  public SonarLintGlobalSettings getState() {
-    this.rules = rulesByKey.values();
-    return this;
-  }
-
-  @Override
-  public void loadState(SonarLintGlobalSettings state) {
-    XmlSerializerUtil.copyBean(state, this);
-    initializeRulesByKey();
-  }
-
   private void initializeRulesByKey() {
     this.rulesByKey = new HashMap<>(rules.stream().collect(Collectors.toMap(Rule::getKey, Function.identity())));
-  }
-
-  @Override
-  @NotNull
-  public File[] getExportFiles() {
-    return new File[] {PathManager.getOptionsFile("sonarlint")};
-  }
-
-  @Override
-  @NotNull
-  public String getPresentableName() {
-    return SonarLintBundle.message("sonarlint.settings");
-  }
-
-  @Override
-  @NotNull
-  @NonNls
-  public String getComponentName() {
-    return "SonarLintGlobalSettings";
   }
 
   public Map<String, Rule> getRulesByKey() {
@@ -155,19 +115,20 @@ public final class SonarLintGlobalSettings implements PersistentStateComponent<S
     initializeRulesByKey();
   }
 
-  public Set<String> excludedRules() {
-    return rulesByKey.entrySet().stream()
-      .filter(it -> !it.getValue().isActive)
-      .map(Map.Entry::getKey)
-      .collect(Collectors.toSet());
-  }
-
   public boolean isAutoTrigger() {
     return autoTrigger;
   }
 
   public void setAutoTrigger(boolean autoTrigger) {
     this.autoTrigger = autoTrigger;
+  }
+
+  public String getNodejsPath() {
+    return nodejsPath;
+  }
+
+  public void setNodejsPath(String nodejsPath) {
+    this.nodejsPath = nodejsPath;
   }
 
   public List<SonarQubeServer> getSonarQubeServers() {

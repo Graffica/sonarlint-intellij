@@ -50,6 +50,7 @@
 
     <change-notes><![CDATA[
       <ul>
+        <li>4.12 - Lots of new rules for Java (including test code), support analysis of Java 14. 20 new rules for PHP, including 13 related to unit tests. 2 new rules for JavaScript. 3 new rules for Python. Bug fixes and improvements.</li>
         <li>4.11 - Improve issues, flows and secondary locations navigation and highlighting. Show secondary location indexes in the editor. Add 'Show rule description' and 'Show data flow/issue locations' contextual actions. Relax search criteria in rule configuration filter. Show effective rule parameter in the rule description panel. Bug fixes and improvements.</li>
         <li>4.10 - Fix duplicated annotations for PHP files. Display rule severity defined in the quality profile in connected mode. Fix analysis failure with JSP files. Bug fixes and improvements for JS files. 4 new rules (3 security related), bug fixes and improvements for PHP files.</li>
         <li>4.9 - Many new rules about JUnit and AssertJ for Java test files. 10 new rules for PHP. 22 new rules for Python and support of Typeshed packages. Preparatory changes for dynamic plugin installation.</li>
@@ -107,7 +108,7 @@
 
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
     // we need listeners registration
-    <idea-version since-build="183.2940.10"/>
+    <idea-version since-build="183.4588.3"/>
 
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html
          on how to target different products -->
@@ -143,7 +144,7 @@
         <externalAnnotator language="Scala" implementationClass="org.sonarlint.intellij.editor.SonarExternalAnnotator"/>
         <externalAnnotator language="Swift" implementationClass="org.sonarlint.intellij.editor.SonarExternalAnnotator"/>
 
-        <applicationService serviceImplementation="org.sonarlint.intellij.config.global.SonarLintGlobalSettings"/>
+        <applicationService serviceImplementation="org.sonarlint.intellij.config.global.SonarLintGlobalSettingsStore"/>
         <applicationService serviceImplementation="org.sonarlint.intellij.core.SonarLintEngineManager"/>
         <applicationService serviceImplementation="org.sonarlint.intellij.SonarLintPlugin"/>
         <applicationService serviceInterface="org.sonarlint.intellij.util.GlobalLogOutput"
@@ -153,9 +154,10 @@
         <applicationService serviceInterface="org.sonarlint.intellij.telemetry.SonarLintTelemetry"
                             serviceImplementation="org.sonarlint.intellij.telemetry.SonarLintTelemetryImpl" />
         <applicationService serviceImplementation="org.sonarlint.intellij.core.ServerNotifications"/>
+        <applicationService serviceImplementation="org.sonarlint.intellij.core.NodeJsManager"/>
 
         <projectService serviceImplementation="org.sonarlint.intellij.core.ProjectBindingManager"/>
-        <projectService serviceImplementation="org.sonarlint.intellij.config.project.SonarLintProjectSettings"/>
+        <projectService serviceImplementation="org.sonarlint.intellij.config.project.SonarLintProjectSettingsStore"/>
         <projectService serviceImplementation="org.sonarlint.intellij.core.SonarLintProjectNotifications"/>
         <projectService serviceInterface="org.sonarlint.intellij.ui.SonarLintConsole"
                         serviceImplementation="org.sonarlint.intellij.ui.SonarLintConsoleImpl"
@@ -176,7 +178,7 @@
 
         <moduleService serviceImplementation="org.sonarlint.intellij.analysis.VirtualFileTestPredicate"/>
         <moduleService serviceImplementation="org.sonarlint.intellij.core.ModuleBindingManager"/>
-        <moduleService serviceImplementation="org.sonarlint.intellij.config.module.SonarLintModuleSettings"/>
+        <moduleService serviceImplementation="org.sonarlint.intellij.config.module.SonarLintModuleSettingsStore"/>
         
         <postStartupActivity implementation="org.sonarlint.intellij.BootstrapStartupActivity"/>
         <postStartupActivity implementation="org.sonarlint.intellij.trigger.EditorOpenTrigger"/>

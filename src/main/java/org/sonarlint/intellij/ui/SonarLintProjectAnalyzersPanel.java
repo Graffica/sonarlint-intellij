@@ -63,7 +63,7 @@ public class SonarLintProjectAnalyzersPanel {
       List<PluginDetails> loadedAnalyzers = Stream.of(ModuleManager.getInstance(project).getModules())
               .flatMap(module -> {
                 try {
-                  return bindingManager.getFacade(module, true).getLoadedAnalyzers().stream();
+                  return bindingManager.getFacade(module, true).getPluginDetails().stream();
                 } catch (InvalidBindingException e) {
                   return Stream.empty();
                 }

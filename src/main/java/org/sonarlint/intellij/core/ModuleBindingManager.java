@@ -35,6 +35,8 @@ import org.sonarlint.intellij.util.SonarLintUtils;
 import org.sonarsource.sonarlint.core.client.api.connected.ConnectedSonarLintEngine;
 import org.sonarsource.sonarlint.core.client.api.connected.ProjectBinding;
 
+import static org.sonarlint.intellij.config.Settings.getSettingsFor;
+
 public class ModuleBindingManager {
   private final Module module;
 
@@ -48,7 +50,7 @@ public class ModuleBindingManager {
     if (projectKey == null) {
       return null;
     }
-    SonarLintModuleSettings settings = SonarLintUtils.getService(module, SonarLintModuleSettings.class);
+    SonarLintModuleSettings settings = getSettingsFor(module);
     return new ProjectBinding(projectKey, settings.getSqPathPrefix(), settings.getIdePathPrefix());
   }
 
@@ -59,7 +61,7 @@ public class ModuleBindingManager {
     }
     List<String> moduleFiles = collectPathsForModule();
     ProjectBinding projectBinding = engine.calculatePathPrefixes(projectKey, moduleFiles);
-    SonarLintModuleSettings settings = SonarLintUtils.getService(module, SonarLintModuleSettings.class);
+    SonarLintModuleSettings settings = getSettingsFor(module);
     settings.setIdePathPrefix(projectBinding.idePathPrefix());
     settings.setSqPathPrefix(projectBinding.sqPathPrefix());
   }
@@ -82,7 +84,7 @@ public class ModuleBindingManager {
   }
 
   private String resolveProjectKey(Module module) {
-    SonarLintProjectSettings settings = SonarLintUtils.getService(module.getProject(), SonarLintProjectSettings.class);
+    SonarLintProjectSettings settings = getSettingsFor(module.getProject());
     return SonarLintProjectSettings.resolveProjectkey(module.getProject(), module, settings);
   }
 }

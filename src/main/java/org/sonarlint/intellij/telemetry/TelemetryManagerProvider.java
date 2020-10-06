@@ -27,15 +27,19 @@ import com.intellij.util.net.ssl.CertificateManager;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import javax.annotation.CheckForNull;
 import org.sonarlint.intellij.SonarLintPlugin;
-import org.sonarlint.intellij.config.project.SonarLintProjectSettings;
+import org.sonarlint.intellij.core.NodeJsManager;
 import org.sonarlint.intellij.core.ProjectBindingManager;
 import org.sonarlint.intellij.exception.InvalidBindingException;
 import org.sonarlint.intellij.util.SonarLintUtils;
 import org.sonarsource.sonarlint.core.client.api.common.TelemetryClientConfig;
+import org.sonarsource.sonarlint.core.client.api.common.Version;
 import org.sonarsource.sonarlint.core.telemetry.TelemetryClient;
 import org.sonarsource.sonarlint.core.telemetry.TelemetryManager;
 import org.sonarsource.sonarlint.core.telemetry.TelemetryPathManager;
+
+import static org.sonarlint.intellij.config.Settings.getSettingsFor;
 
 public class TelemetryManagerProvider {
   private static final String TELEMETRY_PRODUCT_KEY = "idea";
@@ -48,7 +52,16 @@ public class TelemetryManagerProvider {
     TelemetryClientConfig clientConfig = getTelemetryClientConfig();
     SonarLintPlugin plugin = SonarLintUtils.getService(SonarLintPlugin.class);
     TelemetryClient client = new TelemetryClient(clientConfig, PRODUCT, plugin.getVersion(), SonarLintUtils.getIdeVersionForTelemetry());
-    return new TelemetryManager(getStorageFilePath(), client, this::isAnyProjectConnected, this::isAnyProjectConnectedToSonarCloud);
+    return new TelemetryManager(getStorageFilePath(), client, this::isAnyProjectConnected, this::isAnyProjectConnectedToSonarCloud, this::getNodeJsVersion);
+  }
+
+  @CheckForNull
+  private String getNodeJsVersion() {
+    final Version nodeJsVersion = SonarLintUtils.getService(NodeJsManager.class).getNodeJsVersion();
+    if (nodeJsVersion != null) {
+      return nodeJsVersion.toString();
+    }
+    return null;
   }
 
   private static TelemetryClientConfig getTelemetryClientConfig() {
@@ -76,7 +89,7 @@ public class TelemetryManagerProvider {
   private boolean isAnyProjectConnected() {
     ProjectManager projectManager = ProjectManager.getInstance();
     Project[] openProjects = projectManager.getOpenProjects();
-    return Arrays.stream(openProjects).anyMatch(p -> SonarLintUtils.getService(p, SonarLintProjectSettings.class).isBindingEnabled());
+    return Arrays.stream(openProjects).anyMatch(p -> getSettingsFor(p).isBindingEnabled());
   }
 
   private boolean isAnyProjectConnectedToSonarCloud() {

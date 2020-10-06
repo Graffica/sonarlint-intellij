@@ -27,13 +27,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.sonar.api.utils.log.Loggers;
-import org.sonarlint.intellij.config.global.SonarLintGlobalSettings;
 import org.sonarlint.intellij.config.global.SonarQubeServer;
 import org.sonarlint.intellij.exception.InvalidBindingException;
-import org.sonarlint.intellij.util.SonarLintUtils;
 import org.sonarsource.sonarlint.core.client.api.connected.ConnectedSonarLintEngine;
 import org.sonarsource.sonarlint.core.client.api.connected.ProjectStorageStatus;
 import org.sonarsource.sonarlint.core.client.api.standalone.StandaloneSonarLintEngine;
+
+import static org.sonarlint.intellij.config.Settings.getGlobalSettings;
 
 public class SonarLintEngineManager implements Disposable {
   private final Map<String, ConnectedSonarLintEngine> engines = new HashMap<>();
@@ -91,7 +91,7 @@ public class SonarLintEngineManager implements Disposable {
   /**
    * Immediately removes and asynchronously stops all {@link ConnectedSonarLintEngine} corresponding to server IDs that were removed.
    */
-  public synchronized void reloadServers() {
+  public synchronized void stopAllDeletedConnectedEngines() {
     Iterator<Map.Entry<String, ConnectedSonarLintEngine>> it = engines.entrySet().iterator();
     Set<String> configuredStorageIds = getServerNames();
     while (it.hasNext()) {
@@ -100,6 +100,18 @@ public class SonarLintEngineManager implements Disposable {
         stopInThread(e.getValue());
         it.remove();
       }
+    }
+  }
+
+  public synchronized void stopAllEngines() {
+    AnalysisRequirementNotifications.resetCachedMessages();
+    for (ConnectedSonarLintEngine e : engines.values()) {
+      e.stop(false);
+    }
+    engines.clear();
+    if (standalone != null) {
+      standalone.stop();
+      standalone = null;
     }
   }
 
@@ -136,22 +148,14 @@ public class SonarLintEngineManager implements Disposable {
   }
 
   private static Set<String> getServerNames() {
-    SonarLintGlobalSettings settings = SonarLintUtils.getService(SonarLintGlobalSettings.class);
-    return settings.getSonarQubeServers().stream()
+    return getGlobalSettings().getSonarQubeServers().stream()
       .map(SonarQubeServer::getName)
       .collect(Collectors.toSet());
   }
 
   @Override
   public void dispose() {
-    for (ConnectedSonarLintEngine e : engines.values()) {
-      e.stop(false);
-    }
-    engines.clear();
-    if (standalone != null) {
-      standalone.stop();
-      standalone = null;
-    }
+    stopAllEngines();
     Loggers.setTarget(null);
   }
 }

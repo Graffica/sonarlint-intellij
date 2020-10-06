@@ -1,7 +1,7 @@
 /*
  * SonarLint for IntelliJ IDEA
  * Copyright (C) 2015-2020 SonarSource
- * sonarlint@sonarsource.com
+ * engine@sonarsource.com
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -47,16 +47,20 @@ import org.sonarsource.sonarlint.core.client.api.connected.ConnectedRuleDetails;
 import org.sonarsource.sonarlint.core.client.api.connected.ConnectedSonarLintEngine;
 import org.sonarsource.sonarlint.core.client.api.connected.ProjectBinding;
 
-class ConnectedSonarLintFacade extends SonarLintFacade {
-  private final ConnectedSonarLintEngine sonarlint;
-  private final Module module;
+import static org.sonarlint.intellij.config.Settings.getSettingsFor;
 
-  ConnectedSonarLintFacade(ConnectedSonarLintEngine engine, Project project, Module module) {
+class ConnectedSonarLintFacade extends SonarLintFacade {
+  private final ConnectedSonarLintEngine engine;
+  private final Module module;
+  private final String connectionId;
+
+  ConnectedSonarLintFacade(String connectionId, ConnectedSonarLintEngine engine, Project project, Module module) {
     super(project);
+    this.connectionId = connectionId;
     Preconditions.checkNotNull(project, "project");
     Preconditions.checkNotNull(project.getBasePath(), "project base path");
     Preconditions.checkNotNull(engine, "engine");
-    this.sonarlint = engine;
+    this.engine = engine;
     this.module = module;
   }
 
@@ -72,7 +76,9 @@ class ConnectedSonarLintFacade extends SonarLintFacade {
     SonarLintConsole console = SonarLintUtils.getService(project, SonarLintConsole.class);
     console.debug("Starting analysis with configuration:\n" + config.toString());
 
-    return sonarlint.analyze(config, issueListener, new ProjectLogOutput(project), progressMonitor);
+    final AnalysisResults analysisResults = engine.analyze(config, issueListener, new ProjectLogOutput(project), progressMonitor);
+    AnalysisRequirementNotifications.notifyOnceForSkippedPlugins(analysisResults, engine.getPluginDetails(), project);
+    return analysisResults;
   }
 
   @Override
@@ -85,22 +91,22 @@ class ConnectedSonarLintFacade extends SonarLintFacade {
     }
 
     Function<VirtualFile, String> ideFilePathExtractor = s -> SonarLintAppUtils.getPathRelativeToProjectBaseDir(module.getProject(), s);
-    return sonarlint.getExcludedFiles(binding, files, ideFilePathExtractor, testPredicate);
+    return engine.getExcludedFiles(binding, files, ideFilePathExtractor, testPredicate);
   }
 
   @Override
-  public Collection<PluginDetails> getLoadedAnalyzers() {
-    return sonarlint.getPluginDetails();
+  public Collection<PluginDetails> getPluginDetails() {
+    return engine.getPluginDetails();
   }
 
   @Override
-  public ConnectedRuleDetails ruleDetails(String ruleKey) {
-    return sonarlint.getActiveRuleDetails(ruleKey, resolveProjectKey());
+  public ConnectedRuleDetails getActiveRuleDetails(String ruleKey) {
+    return engine.getActiveRuleDetails(ruleKey, resolveProjectKey());
   }
 
   @Override
   public String getDescription(String ruleKey) {
-    ConnectedRuleDetails details = ruleDetails(ruleKey);
+    ConnectedRuleDetails details = getActiveRuleDetails(ruleKey);
     if (details == null) {
       return null;
     }
@@ -113,7 +119,7 @@ class ConnectedSonarLintFacade extends SonarLintFacade {
 
   @Nullable
   private String resolveProjectKey() {
-    return SonarLintProjectSettings.resolveProjectkey(project, module, SonarLintUtils.getService(project, SonarLintProjectSettings.class));
+    return SonarLintProjectSettings.resolveProjectkey(project, module, getSettingsFor(project));
   }
 
 }

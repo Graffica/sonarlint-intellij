@@ -60,6 +60,8 @@ import java.util.List;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.sonarlint.intellij.config.Settings.getSettingsFor;
+
 public class SonarQubeServerMgmtPanel implements Disposable, ConfigurationPanel<SonarLintGlobalSettings> {
   private static final String LABEL_NO_SERVERS = "Add a connection to SonarQube or SonarCloud";
 
@@ -191,8 +193,8 @@ public class SonarQubeServerMgmtPanel implements Disposable, ConfigurationPanel<
 
     Project[] openProjects = ProjectManager.getInstance().getOpenProjects();
 
-    for (Project p : openProjects) {
-      SonarLintProjectSettings projectSettings = SonarLintUtils.getService(p, SonarLintProjectSettings.class);
+    for (Project openProject : openProjects) {
+      SonarLintProjectSettings projectSettings = getSettingsFor(openProject);
       if (projectSettings.getServerId() != null && deletedServerIds.contains(projectSettings.getServerId())) {
         projectSettings.setBindingEnabled(false);
         projectSettings.setServerId(null);
@@ -241,6 +243,10 @@ public class SonarQubeServerMgmtPanel implements Disposable, ConfigurationPanel<
   @Nullable
   private SonarQubeServer getSelectedServer() {
     return serverList.getSelectedValue();
+  }
+
+  List<SonarQubeServer> getServers() {
+    return servers;
   }
 
   private void onServerSelect() {
@@ -295,7 +301,7 @@ public class SonarQubeServerMgmtPanel implements Disposable, ConfigurationPanel<
       case NEED_UPDATE:
         builder.append("needs update");
         break;
-      case UNKNOW:
+      case UNKNOWN:
       default:
         builder.append("unknown");
         break;
@@ -318,12 +324,12 @@ public class SonarQubeServerMgmtPanel implements Disposable, ConfigurationPanel<
     Map<String, Project> projectsPerModule = new HashMap<>();
     Map<String, String> vcsRootMapping = new HashMap<>();
 
-    for (Project p : openProjects) {
-      SonarLintProjectSettings projectSettings = SonarLintUtils.getService(p, SonarLintProjectSettings.class);
+    for (Project openProject : openProjects) {
+      SonarLintProjectSettings projectSettings = getSettingsFor(openProject);
       if (!projectSettings.getVcsRootMapping().isEmpty()) {
         // this condition is not pulled up to make merging easy in future.
         if (projectSettings.isBindingEnabled() && server.getName().equals(projectSettings.getServerId())) {
-          projectSettings.getVcsRootMapping().values().forEach(key -> projectsPerModule.put(key, p));
+          projectSettings.getVcsRootMapping().values().forEach(key -> projectsPerModule.put(key, openProject));
         }
         vcsRootMapping.putAll(projectSettings.getVcsRootMapping());
       }
@@ -414,10 +420,10 @@ public class SonarQubeServerMgmtPanel implements Disposable, ConfigurationPanel<
     private List<String> getOpenProjectNames(Project[] openProjects, SonarQubeServer server) {
       List<String> openProjectNames = new LinkedList<>();
 
-      for (Project p : openProjects) {
-        SonarLintProjectSettings projectSettings = SonarLintUtils.getService(p, SonarLintProjectSettings.class);
+      for (Project openProject : openProjects) {
+        SonarLintProjectSettings projectSettings = getSettingsFor(openProject);
         if (server.getName().equals(projectSettings.getServerId())) {
-          openProjectNames.add(p.getName());
+          openProjectNames.add(openProject.getName());
         }
       }
       return openProjectNames;

@@ -36,8 +36,7 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
-@State(name = "SonarLintProjectSettings", storages = {@Storage("sonarlint.xml")})
-public final class SonarLintProjectSettings implements PersistentStateComponent<SonarLintProjectSettings> {
+public final class SonarLintProjectSettings {
   private static final Logger LOGGER = Logger.getInstance(SonarLintProjectSettings.class);
 
   private boolean verboseEnabled = false;
@@ -47,33 +46,6 @@ public final class SonarLintProjectSettings implements PersistentStateComponent<
   private String serverId = null;
   private List<String> fileExclusions = new ArrayList<>();
   private Map<String, String> vcsRootMapping = new LinkedHashMap<>();
-
-  /**
-   * Constructor called by the XML serialization and deserialization (no args).
-   * Even though this class has the scope of a project, we can't have it injected here.
-   */
-  public SonarLintProjectSettings() {
-
-  }
-
-  /**
-   * TODO Replace @Deprecated with @NonInjectable when switching to 2019.3 API level
-   * @deprecated in 4.2 to silence a check in 2019.3
-   */
-  @Deprecated
-  public SonarLintProjectSettings(SonarLintProjectSettings toCopy) {
-    XmlSerializerUtil.copyBean(toCopy, this);
-  }
-
-  @Override
-  public synchronized SonarLintProjectSettings getState() {
-    return this;
-  }
-
-  @Override
-  public synchronized void loadState(SonarLintProjectSettings state) {
-    XmlSerializerUtil.copyBean(state, this);
-  }
 
   public boolean isVerboseEnabled() {
     return verboseEnabled;
@@ -117,7 +89,7 @@ public final class SonarLintProjectSettings implements PersistentStateComponent<
   }
 
   public List<String> getFileExclusions() {
-    return new ArrayList<>(fileExclusions);
+    return fileExclusions;
   }
 
   public void setFileExclusions(List<String> fileExclusions) {

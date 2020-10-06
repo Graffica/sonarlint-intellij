@@ -56,7 +56,7 @@ public class ConnectedSonarLintFacadeTest extends AbstractSonarLintLightTests {
     replaceProjectService(ProjectLevelVcsManager.class, projectLevelVcsManager);
     getProjectSettings().setVcsRootMapping(ImmutableMap.of("/project", "projectKey"));
 
-    facade = new ConnectedSonarLintFacade(engine, getProject(), module);
+    facade = new ConnectedSonarLintFacade("mySqServer", engine, getProject(), module);
 
     VirtualFile moduleFile = mock(VirtualFile.class);
     when(module.getModuleFile()).thenReturn(moduleFile);
@@ -77,7 +77,7 @@ public class ConnectedSonarLintFacadeTest extends AbstractSonarLintLightTests {
   public void should_get_rule_details() {
     ConnectedRuleDetails ruleDetails = mock(ConnectedRuleDetails.class);
     when(engine.getActiveRuleDetails("rule1", "projectKey")).thenReturn(ruleDetails);
-    assertThat(facade.ruleDetails("rule1")).isEqualTo(ruleDetails);
+    assertThat(facade.getActiveRuleDetails("rule1")).isEqualTo(ruleDetails);
   }
 
   @Test
